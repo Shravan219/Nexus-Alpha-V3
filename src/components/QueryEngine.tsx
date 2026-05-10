@@ -33,7 +33,10 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+      const viewport = scrollRef.current.querySelector('[data-slot="scroll-area-viewport"]');
+      if (viewport) {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+      }
     }
   }, [messages, loadStep]);
 
@@ -119,7 +122,7 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-black relative">
+    <div className="flex-1 flex flex-col h-full bg-black relative overflow-hidden">
       <header className="p-4 border-b border-[#1a1a1a] flex items-center justify-between bg-black/50 backdrop-blur-md z-10">
         <div className="flex items-center gap-3">
           <Cpu size={14} className="text-blue-500" />
@@ -138,7 +141,7 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
         </div>
       </header>
 
-      <ScrollArea ref={scrollRef} className="flex-1 px-4 lg:px-20 py-10">
+      <ScrollArea ref={scrollRef} className="flex-1 px-4 lg:px-20 py-10 min-h-0">
         <div className="max-w-4xl mx-auto space-y-12 pb-32">
           {messages.length === 0 && !isLoading && (
             <div className="h-[60vh] flex flex-col items-center justify-center gap-6 opacity-40">
@@ -237,8 +240,8 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
         </div>
       </ScrollArea>
 
-      <div className="p-6 pb-10 max-w-4xl mx-auto w-full absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/90 to-transparent">
-        <form onSubmit={handleSend} className="relative group">
+      <div className="p-6 pb-10 max-w-4xl mx-auto w-full absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/90 to-transparent pointer-events-none">
+        <form onSubmit={handleSend} className="relative group pointer-events-auto">
           <input 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -254,7 +257,7 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
             {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
           </button>
         </form>
-        <p className="text-[9px] text-zinc-600 font-mono tracking-tighter text-center mt-4 uppercase">
+        <p className="text-[9px] text-zinc-600 font-mono tracking-tighter text-center mt-4 uppercase pointer-events-auto">
           Nexus Alpha Institutional Memory Engine  •  Experimental Release 0.1.0  •  Stable Link
         </p>
       </div>
