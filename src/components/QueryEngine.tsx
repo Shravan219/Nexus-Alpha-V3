@@ -83,16 +83,14 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
     setTimeout(() => setLoadStep(3), 1600);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rag-chat`, {
+      const response = await fetch('/api/rag-chat', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           query: userQuery,
           conversationId: currentConversationId,
-          geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY,
           documentId: selectedDocId
         })
       });

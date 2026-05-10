@@ -30,17 +30,15 @@ export default function Vault({ documents, onRefresh }: VaultProps) {
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-document`, {
+      const response = await fetch('/api/process-document', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           documentId: docId,
           fileUrl,
-          filename,
-          geminiApiKey
+          filename
         })
       });
 
