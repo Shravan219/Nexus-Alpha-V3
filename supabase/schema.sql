@@ -76,6 +76,12 @@ begin
   limit match_count;
 end;
 $$;
+
+-- IMPORTANT: Disable RLS for backend ingestion
+alter table public.document_chunks disable row level security;
+alter table public.documents disable row level security;
+alter table public.messages disable row level security;
+alter table public.conversations disable row level security;
 ```
 
 # Storage Setup

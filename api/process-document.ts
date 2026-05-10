@@ -79,7 +79,7 @@ export default async function handler(req: any, res: any) {
 
         const embedding = await getEmbedding(chunkText, GEMINI_API_KEY!);
 
-        await supabase.from('document_chunks').insert({
+        const { error: insertError } = await supabase.from('document_chunks').insert({
           document_id: documentId,
           filename,
           page_number: page.page_number,
@@ -87,6 +87,11 @@ export default async function handler(req: any, res: any) {
           content: chunkText,
           embedding
         });
+
+        if (insertError) {
+          console.error(`Chunk insert failed at index ${chunkIndex-1}:`, JSON.stringify(insertError));
+          throw new Error(`Failed to insert chunk: ${insertError.message}`);
+        }
 
         totalChunks++;
       }
