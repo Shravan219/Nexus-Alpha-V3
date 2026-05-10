@@ -28,43 +28,22 @@ const extractTextFromPDF = (buffer: Buffer): Promise<{page_number: number, text:
 };
 
 const getEmbedding = async (text: string, apiKey: string): Promise<number[]> => {
-  const models = [
-    'gemini-embedding-exp-03-07',
-    'text-embedding-004',
-    'embedding-001'
-  ];
-  
-  const versions = ['v1beta', 'v1'];
-  
-  for (const version of versions) {
-    for (const model of models) {
-      try {
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/${version}/models/${model}:embedContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: `models/${model}`,
-              content: { parts: [{ text }] }
-            })
-          }
-        );
-        
-        if (!res.ok) continue;
-        
-        const data = await res.json();
-        if (data?.embedding?.values) {
-          console.log(`Embedding success: ${version}/${model}`);
-          return data.embedding.values;
-        }
-      } catch (e) {
-        continue;
-      }
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'models/gemini-embedding-001',
+        content: { parts: [{ text }] }
+      })
     }
+  );
+  const data = await res.json();
+  if (!data?.embedding?.values) {
+    throw new Error(`Embedding failed: ${JSON.stringify(data)}`);
   }
-  
-  throw new Error('All embedding models failed. Check your Gemini API key has embedding permissions.');
+  return data.embedding.values;
 };
 
 dotenv.config();
@@ -183,6 +162,7 @@ async function startServer() {
 
       const { data: chunks, error: matchError } = await supabase.rpc('match_documents', {
         query_embedding: queryEmbedding,
+        match_threshold: 0.5,
         match_count: 8,
         filter_document_id: documentId || null
       });

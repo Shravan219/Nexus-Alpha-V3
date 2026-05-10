@@ -77,7 +77,7 @@ export default function Dashboard({ documents, conversations, onNavigateToDocs }
               <div className="mt-1 h-2 w-2 rounded-full bg-blue-600 shrink-0" />
               <div>
                 <p className="text-sm font-bold">1. Ingestion Pipeline</p>
-                <p className="text-xs text-zinc-500 mt-1">Upload institutional PDFs. The engine extracts text and generates high-dimensional embeddings via Gemini text-embedding-004.</p>
+                <p className="text-xs text-zinc-500 mt-1">Upload institutional PDFs. The engine extracts text and generates high-dimensional embeddings via Gemini gemini-embedding-001.</p>
               </div>
             </div>
             <div className="flex gap-4">

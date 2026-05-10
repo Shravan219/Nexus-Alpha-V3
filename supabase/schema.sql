@@ -55,7 +55,8 @@ create table messages (
 -- Similarity Search Function
 create or replace function match_documents(
   query_embedding vector(768),
-  match_count int default 8,
+  match_threshold float,
+  match_count int,
   filter_document_id uuid default null
 )
 returns table (
@@ -69,9 +70,8 @@ begin
     dc.chunk_index, dc.content,
     1 - (dc.embedding <=> query_embedding) as similarity
   from document_chunks dc
-  where case when filter_document_id is not null
-    then dc.document_id = filter_document_id
-    else true end
+  where (filter_document_id is null or dc.document_id = filter_document_id)
+    and 1 - (dc.embedding <=> query_embedding) > match_threshold
   order by dc.embedding <=> query_embedding
   limit match_count;
 end;
