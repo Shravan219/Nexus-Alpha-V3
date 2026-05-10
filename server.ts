@@ -23,29 +23,60 @@ async function startServer() {
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY!
   );
 
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn("[Warning] SUPABASE_SERVICE_ROLE_KEY missing. Using ANON key. Server-side writes may fail due to RLS.");
+  } else {
+    console.log("[Info] Using SUPABASE_SERVICE_ROLE_KEY for server-side processing.");
+  }
+
   const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
   // --- API ROUTES ---
 
   // 1. Process Document Logic
   app.post("/api/process-document", async (req, res) => {
-    const { documentId, fileUrl, filename } = req.json || req.body;
+    const body = req.body;
+    const { documentId, fileUrl, filename } = body;
     
     try {
-      console.log(`[Server] Processing document: ${filename}`);
+      console.log(`[Server] Starting extraction for: ${filename} (ID: ${documentId})`);
       
-      // Update status to processing
-      await supabase.from('documents').update({ status: 'processing' }).eq('id', documentId);
+      if (!documentId || !fileUrl) {
+        throw new Error("Missing documentId or fileUrl in request");
+      }
 
+      // Update status to processing
+      const { error: startError } = await supabase
+        .from('documents')
+        .update({ status: 'processing', error_message: null })
+        .eq('id', documentId);
+      
+      if (startError) {
+        console.error("[Supabase Error - Start]", startError);
+        throw startError;
+      }
+
+      console.log(`[Server] Downloading: ${fileUrl}`);
       // Download PDF
       const pdfResponse = await fetch(fileUrl);
+      if (!pdfResponse.ok) throw new Error(`Failed to download file: ${pdfResponse.statusText}`);
+      
       const buffer = Buffer.from(await pdfResponse.arrayBuffer());
+      console.log(`[Server] Parsing PDF...`);
 
       // Extract text
-      const data = await pdfParse(buffer);
+      let data;
+      try {
+        data = await pdfParse(buffer);
+      } catch (parseError: any) {
+        throw new Error(`PDF Parsing failed: ${parseError.message}`);
+      }
+
       const pages = data.text.split('\f')
         .map((text, i) => ({ page_number: i + 1, text: text.trim() }))
         .filter(p => p.text.length > 0);
+
+      console.log(`[Server] Extracted ${pages.length} pages. Generating embeddings...`);
 
       let chunkIndex = 0;
       let totalChunks = 0;
@@ -72,12 +103,12 @@ async function startServer() {
             }
           );
           const embedData = await embedRes.json();
-          if (embedData.error) throw new Error(embedData.error.message);
+          if (embedData.error) throw new Error(`Gemini Embedding Error: ${embedData.error.message}`);
           
           const embedding = embedData.embedding.values;
 
           // Insert chunk
-          await supabase.from('document_chunks').insert({
+          const { error: chunkError } = await supabase.from('document_chunks').insert({
             document_id: documentId,
             filename,
             page_number: page.page_number,
@@ -86,25 +117,46 @@ async function startServer() {
             embedding
           });
 
+          if (chunkError) {
+            console.error("[Supabase Error - Chunk Insert]", chunkError);
+            throw chunkError;
+          }
+
           totalChunks++;
         }
       }
 
-      await supabase.from('documents').update({ status: 'ready', chunk_count: totalChunks }).eq('id', documentId);
+      console.log(`[Server] Success! Generated ${totalChunks} chunks.`);
+
+      const { error: endError } = await supabase
+        .from('documents')
+        .update({ status: 'ready', chunk_count: totalChunks })
+        .eq('id', documentId);
+      
+      if (endError) throw endError;
+
       res.json({ success: true, chunks: totalChunks });
 
     } catch (error: any) {
-      console.error("[Server Error]", error);
-      await supabase.from('documents').update({ status: 'error', error_message: error.message }).eq('id', documentId);
-      res.status(500).json({ error: error.message });
+      console.error("[Server Processing Error]", error);
+      
+      // Attempt to mark as error in DB
+      await supabase
+        .from('documents')
+        .update({ status: 'error', error_message: error.message || String(error) })
+        .eq('id', documentId);
+
+      res.status(500).json({ error: error.message || "Internal processing error" });
     }
   });
 
-  // 2. RAG Chat Logic
   app.post("/api/rag-chat", async (req, res) => {
-    const { query, conversationId, documentId } = req.json || req.body;
+    const body = req.body;
+    const { query, conversationId, documentId } = body;
     
     try {
+      console.log(`[Server] RAG Query: "${query}" (DocID: ${documentId || 'All'})`);
+      
       // Embed query
       const embedRes = await fetch(
         `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`,
@@ -118,15 +170,23 @@ async function startServer() {
         }
       );
       const embedData = await embedRes.json();
-      if (embedData.error) throw new Error(embedData.error.message);
+      if (embedData.error) throw new Error(`Embedding Error: ${embedData.error.message}`);
       const queryEmbedding = embedData.embedding.values;
 
+      console.log(`[Server] Performing similarity search...`);
       // Similarity search
-      const { data: chunks } = await supabase.rpc('match_documents', {
+      const { data: chunks, error: matchError } = await supabase.rpc('match_documents', {
         query_embedding: queryEmbedding,
         match_count: 8,
         filter_document_id: documentId || null
       });
+
+      if (matchError) {
+        console.error("[Supabase Error - Match]", matchError);
+        throw matchError;
+      }
+
+      console.log(`[Server] Found ${chunks?.length || 0} relevant context chunks.`);
 
       const context = chunks?.map((chunk: any) =>
         `[DOC: ${chunk.filename} · Page ${chunk.page_number}]\n${chunk.content}`
