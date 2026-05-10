@@ -4,7 +4,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
-import pdfParse from "pdf-parse";
+// @ts-ignore
+import pdfParse from "pdf-parse/lib/index.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -16,7 +17,14 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(cors());
-  app.use(express.json({ limit: '50mb' }));
+  app.use(express.json({ limit: '100mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+
+  // Debug middleware
+  app.use((req, res, next) => {
+    console.log(`[Server] ${req.method} ${req.url}`);
+    next();
+  });
 
   const supabase = createClient(
     process.env.VITE_SUPABASE_URL!,
@@ -33,64 +41,44 @@ async function startServer() {
 
   // --- API ROUTES ---
 
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", message: "Nexus Engine is online" });
+  });
+
   // 1. Process Document Logic
   app.post("/api/process-document", async (req, res) => {
-    const body = req.body;
-    const { documentId, fileUrl, filename } = body;
+    const { documentId, fileUrl, filename } = req.body;
     
+    if (!documentId || !fileUrl) {
+      return res.status(400).json({ error: "Missing documentId or fileUrl" });
+    }
+
     try {
-      console.log(`[Server] Starting extraction for: ${filename} (ID: ${documentId})`);
+      console.log(`[Server] Processing: ${filename}`);
       
-      if (!documentId || !fileUrl) {
-        throw new Error("Missing documentId or fileUrl in request");
-      }
+      await supabase.from('documents').update({ status: 'processing', error_message: null }).eq('id', documentId);
 
-      // Update status to processing
-      const { error: startError } = await supabase
-        .from('documents')
-        .update({ status: 'processing', error_message: null })
-        .eq('id', documentId);
-      
-      if (startError) {
-        console.error("[Supabase Error - Start]", startError);
-        throw startError;
-      }
-
-      console.log(`[Server] Downloading: ${fileUrl}`);
-      // Download PDF
       const pdfResponse = await fetch(fileUrl);
-      if (!pdfResponse.ok) throw new Error(`Failed to download file: ${pdfResponse.statusText}`);
-      
+      if (!pdfResponse.ok) throw new Error(`Download failed: ${pdfResponse.statusText}`);
       const buffer = Buffer.from(await pdfResponse.arrayBuffer());
-      console.log(`[Server] Parsing PDF...`);
 
-      // Extract text
-      let data;
-      try {
-        data = await pdfParse(buffer);
-      } catch (parseError: any) {
-        throw new Error(`PDF Parsing failed: ${parseError.message}`);
-      }
-
+      const data = await pdfParse(buffer);
       const pages = data.text.split('\f')
-        .map((text, i) => ({ page_number: i + 1, text: text.trim() }))
-        .filter(p => p.text.length > 0);
-
-      console.log(`[Server] Extracted ${pages.length} pages. Generating embeddings...`);
+        .map((text: string, i: number) => ({ page_number: i + 1, text: text.trim() }))
+        .filter((p: any) => p.text.length > 0);
 
       let chunkIndex = 0;
       let totalChunks = 0;
 
       for (const page of pages) {
-        const chunkSize = 500;
-        const overlap = 50;
+        const chunkSize = 1000;
+        const overlap = 100;
         const text = page.text;
 
         for (let i = 0; i < text.length; i += chunkSize - overlap) {
           const chunkText = text.slice(i, i + chunkSize);
           if (chunkText.trim().length < 20) continue;
 
-          // Get embedding via REST
           const embedRes = await fetch(
             `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`,
             {
@@ -103,12 +91,11 @@ async function startServer() {
             }
           );
           const embedData = await embedRes.json();
-          if (embedData.error) throw new Error(`Gemini Embedding Error: ${embedData.error.message}`);
+          if (embedData.error) throw new Error(embedData.error.message);
           
           const embedding = embedData.embedding.values;
 
-          // Insert chunk
-          const { error: chunkError } = await supabase.from('document_chunks').insert({
+          await supabase.from('document_chunks').insert({
             document_id: documentId,
             filename,
             page_number: page.page_number,
@@ -117,47 +104,27 @@ async function startServer() {
             embedding
           });
 
-          if (chunkError) {
-            console.error("[Supabase Error - Chunk Insert]", chunkError);
-            throw chunkError;
-          }
-
           totalChunks++;
         }
       }
 
-      console.log(`[Server] Success! Generated ${totalChunks} chunks.`);
-
-      const { error: endError } = await supabase
-        .from('documents')
-        .update({ status: 'ready', chunk_count: totalChunks })
-        .eq('id', documentId);
-      
-      if (endError) throw endError;
-
+      await supabase.from('documents').update({ status: 'ready', chunk_count: totalChunks }).eq('id', documentId);
       res.json({ success: true, chunks: totalChunks });
 
     } catch (error: any) {
-      console.error("[Server Processing Error]", error);
-      
-      // Attempt to mark as error in DB
-      await supabase
-        .from('documents')
-        .update({ status: 'error', error_message: error.message || String(error) })
-        .eq('id', documentId);
-
-      res.status(500).json({ error: error.message || "Internal processing error" });
+      console.error("[Server Error]", error);
+      await supabase.from('documents').update({ status: 'error', error_message: error.message }).eq('id', documentId);
+      res.status(500).json({ error: error.message });
     }
   });
 
+  // 2. RAG Chat Logic
   app.post("/api/rag-chat", async (req, res) => {
-    const body = req.body;
-    const { query, conversationId, documentId } = body;
+    const { query, conversationId, documentId } = req.body;
     
+    if (!query) return res.status(400).json({ error: "Missing query" });
+
     try {
-      console.log(`[Server] RAG Query: "${query}" (DocID: ${documentId || 'All'})`);
-      
-      // Embed query
       const embedRes = await fetch(
         `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`,
         {
@@ -170,38 +137,27 @@ async function startServer() {
         }
       );
       const embedData = await embedRes.json();
-      if (embedData.error) throw new Error(`Embedding Error: ${embedData.error.message}`);
+      if (embedData.error) throw new Error(embedData.error.message);
       const queryEmbedding = embedData.embedding.values;
 
-      console.log(`[Server] Performing similarity search...`);
-      // Similarity search
       const { data: chunks, error: matchError } = await supabase.rpc('match_documents', {
         query_embedding: queryEmbedding,
         match_count: 8,
         filter_document_id: documentId || null
       });
 
-      if (matchError) {
-        console.error("[Supabase Error - Match]", matchError);
-        throw matchError;
-      }
-
-      console.log(`[Server] Found ${chunks?.length || 0} relevant context chunks.`);
+      if (matchError) throw matchError;
 
       const context = chunks?.map((chunk: any) =>
         `[DOC: ${chunk.filename} · Page ${chunk.page_number}]\n${chunk.content}`
       ).join('\n\n') || '';
 
-      const SYSTEM_PROMPT = `You are Nexus, an Institutional Memory Engine. Answer questions ONLY using the document context provided below. Never use your own training data under any circumstances.
-
+      const SYSTEM_PROMPT = `You are Nexus, an Institutional Memory Engine. Answer questions ONLY using context provided.
 STRICT RULES:
-1. Every single claim must be immediately followed by a citation: [DOC: filename · Page #]
-2. If the answer is not in the context respond with: "This information is not present in the Knowledge Vault." followed by an Audit Note flagging what documentation is missing
-3. For SOPs every bullet point needs its own citation
-4. Label Grounded Facts (from documents) vs Architectural Recommendations (best practice when docs incomplete)
-5. Format responses in markdown with clear headers and bullet points`;
+1. Citations: [DOC: filename · Page #]
+2. If unknown: "This information is not present in the Knowledge Vault."
+3. Format as clean markdown.`;
 
-      // Call Gemini
       const geminiRes = await fetch(
         `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
@@ -211,7 +167,7 @@ STRICT RULES:
             system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
             contents: [{
               role: 'user',
-              parts: [{ text: `DOCUMENT CONTEXT:\n${context}\n\nQUESTION: ${query}` }]
+              parts: [{ text: `CONTEXT:\n${context}\n\nQUESTION: ${query}` }]
             }]
           })
         }
@@ -232,6 +188,10 @@ STRICT RULES:
       console.error("[Server Error]", error);
       res.status(500).json({ error: error.message });
     }
+  });
+
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ error: `Route ${req.method} ${req.url} not found` });
   });
 
   // --- VITE MIDDLEWARE ---

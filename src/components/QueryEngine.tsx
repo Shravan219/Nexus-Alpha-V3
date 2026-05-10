@@ -95,8 +95,19 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
         })
       });
 
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const result = await response.json();
+          throw new Error(result.error || `Server error: ${response.status}`);
+        } else {
+          const text = await response.text();
+          console.error("Server returned non-JSON:", text);
+          throw new Error(`Server returned HTML/Text (Error ${response.status}). Check console.`);
+        }
+      }
+
       const result = await response.json();
-      if (result.error) throw new Error(result.error);
 
       await fetchMessages(currentConversationId);
     } catch (error: any) {

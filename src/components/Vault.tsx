@@ -23,12 +23,6 @@ export default function Vault({ documents, onRefresh }: VaultProps) {
   const [isPasteOpen, setIsPasteOpen] = useState(false);
 
   const processDocument = async (docId: string, fileUrl: string, filename: string) => {
-    const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!geminiApiKey) {
-      toast.error('Gemini API Key missing');
-      return;
-    }
-
     try {
       const response = await fetch('/api/process-document', {
         method: 'POST',
@@ -42,9 +36,19 @@ export default function Vault({ documents, onRefresh }: VaultProps) {
         })
       });
 
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const result = await response.json();
+          throw new Error(result.error || `Server error: ${response.status}`);
+        } else {
+          const text = await response.text();
+          console.error("Server returned non-JSON:", text);
+          throw new Error(`Server returned HTML/Text (Error ${response.status}). Check console.`);
+        }
+      }
+
       const result = await response.json();
-      if (result.error) throw new Error(result.error);
-      
       toast.success(`${filename} processed successfully`);
       onRefresh();
     } catch (error: any) {
@@ -150,12 +154,14 @@ export default function Vault({ documents, onRefresh }: VaultProps) {
         </div>
         <div className="flex gap-3">
           <Dialog open={isPasteOpen} onOpenChange={setIsPasteOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="bg-zinc-950 border-zinc-900 hover:bg-zinc-900 gap-2 h-10 px-4 font-mono text-[10px] tracking-widest uppercase">
-                <PlusCircle size={14} />
-                PASTE PROTOCOL
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger 
+              render={
+                <Button variant="outline" className="bg-zinc-950 border-zinc-900 hover:bg-zinc-900 gap-2 h-10 px-4 font-mono text-[10px] tracking-widest uppercase">
+                  <PlusCircle size={14} />
+                  PASTE PROTOCOL
+                </Button>
+              }
+            />
             <DialogContent className="bg-zinc-950 border-zinc-900 text-white max-w-2xl">
               <DialogHeader>
                 <DialogTitle className="font-mono tracking-widest uppercase text-sm">Direct Data Ingest</DialogTitle>
