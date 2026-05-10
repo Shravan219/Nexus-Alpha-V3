@@ -1,0 +1,82 @@
+# Database Setup for Nexus Alpha
+
+Execute the following SQL in your Supabase SQL Editor:
+
+```sql
+-- Enable pgvector
+create extension if not exists vector;
+
+-- Documents Table
+create table documents (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  content_type text not null,
+  size_bytes bigint not null,
+  status text not null default 'pending'
+    check (status in ('pending','processing','ready','error')),
+  chunk_count int default 0,
+  error_message text,
+  created_at timestamptz default now()
+);
+
+-- Document Chunks Table
+create table document_chunks (
+  id uuid primary key default gen_random_uuid(),
+  document_id uuid references documents(id) on delete cascade,
+  filename text not null,
+  page_number int not null,
+  chunk_index int not null,
+  content text not null,
+  embedding vector(768),
+  created_at timestamptz default now()
+);
+
+-- Index for Vector Search
+create index on document_chunks
+  using ivfflat (embedding vector_cosine_ops)
+  with (lists = 100);
+
+-- Conversations Table
+create table conversations (
+  id uuid primary key default gen_random_uuid(),
+  title text not null default 'New Conversation',
+  created_at timestamptz default now()
+);
+
+-- Messages Table
+create table messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid references conversations(id) on delete cascade,
+  role text not null check (role in ('user','assistant')),
+  content text not null,
+  created_at timestamptz default now()
+);
+
+-- Similarity Search Function
+create or replace function match_documents(
+  query_embedding vector(768),
+  match_count int default 8,
+  filter_document_id uuid default null
+)
+returns table (
+  id uuid, filename text, page_number int,
+  chunk_index int, content text, similarity float
+)
+language plpgsql as $$
+begin
+  return query
+  select dc.id, dc.filename, dc.page_number,
+    dc.chunk_index, dc.content,
+    1 - (dc.embedding <=> query_embedding) as similarity
+  from document_chunks dc
+  where case when filter_document_id is not null
+    then dc.document_id = filter_document_id
+    else true end
+  order by dc.embedding <=> query_embedding
+  limit match_count;
+end;
+$$;
+```
+
+# Storage Setup
+Create a bucket named `knowledge-vault` in Supabase Storage. Set it to public or configure RLS as needed.
