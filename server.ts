@@ -4,10 +4,28 @@ import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+import PDFParser from 'pdf2json';
 import dotenv from "dotenv";
+
+const extractTextFromPDF = (buffer: Buffer): Promise<{page_number: number, text: string}[]> => {
+  return new Promise((resolve, reject) => {
+    // @ts-ignore
+    const pdfParser = new PDFParser(null, 1);
+    
+    pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
+      const pages = pdfData.Pages.map((page: any, index: number) => ({
+        page_number: index + 1,
+        text: page.Texts.map((t: any) => 
+          decodeURIComponent(t.R.map((r: any) => r.T).join(' '))
+        ).join(' ')
+      })).filter((p: any) => p.text.trim().length > 0);
+      resolve(pages);
+    });
+    
+    pdfParser.on('pdfParser_dataError', reject);
+    pdfParser.parseBuffer(buffer);
+  });
+};
 
 dotenv.config();
 
@@ -63,11 +81,8 @@ async function startServer() {
       if (!pdfResponse.ok) throw new Error(`Download failed: ${pdfResponse.statusText}`);
       const buffer = Buffer.from(await pdfResponse.arrayBuffer());
 
-      const data = await pdfParse(buffer);
-      const pages = data.text.split('\f')
-        .map((text: string, i: number) => ({ page_number: i + 1, text: text.trim() }))
-        .filter((p: any) => p.text.length > 0);
-
+      const pages = await extractTextFromPDF(buffer);
+      
       let chunkIndex = 0;
       let totalChunks = 0;
 

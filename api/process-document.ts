@@ -1,4 +1,25 @@
 import { createClient } from "@supabase/supabase-js";
+import PDFParser from 'pdf2json';
+
+const extractTextFromPDF = (buffer: Buffer): Promise<{page_number: number, text: string}[]> => {
+  return new Promise((resolve, reject) => {
+    // @ts-ignore
+    const pdfParser = new PDFParser(null, 1);
+    
+    pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
+      const pages = pdfData.Pages.map((page: any, index: number) => ({
+        page_number: index + 1,
+        text: page.Texts.map((t: any) => 
+          decodeURIComponent(t.R.map((r: any) => r.T).join(' '))
+        ).join(' ')
+      })).filter((p: any) => p.text.trim().length > 0);
+      resolve(pages);
+    });
+    
+    pdfParser.on('pdfParser_dataError', reject);
+    pdfParser.parseBuffer(buffer);
+  });
+};
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -22,13 +43,8 @@ export default async function handler(req: any, res: any) {
     const buffer = Buffer.from(await pdfResponse.arrayBuffer());
 
     // 3. Extract text
-    // @ts-ignore
-    const pdfParse = (await import('pdf-parse')).default;
-    const data = await pdfParse(buffer);
-    const pages = data.text.split('\f')
-      .map((text: string, i: number) => ({ page_number: i + 1, text: text.trim() }))
-      .filter((p: any) => p.text.length > 0);
-
+    const pages = await extractTextFromPDF(buffer);
+    
     let chunkIndex = 0;
     let totalChunks = 0;
 
