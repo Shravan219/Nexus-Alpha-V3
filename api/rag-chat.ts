@@ -1,5 +1,45 @@
 import { createClient } from "@supabase/supabase-js";
 
+const getEmbedding = async (text: string, apiKey: string): Promise<number[]> => {
+  const models = [
+    'gemini-embedding-exp-03-07',
+    'text-embedding-004',
+    'embedding-001'
+  ];
+  
+  const versions = ['v1beta', 'v1'];
+  
+  for (const version of versions) {
+    for (const model of models) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/${version}/models/${model}:embedContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: `models/${model}`,
+              content: { parts: [{ text }] }
+            })
+          }
+        );
+        
+        if (!res.ok) continue;
+        
+        const data = await res.json();
+        if (data?.embedding?.values) {
+          console.log(`Embedding success: ${version}/${model}`);
+          return data.embedding.values;
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+  }
+  
+  throw new Error('All embedding models failed. Check your Gemini API key has embedding permissions.');
+};
+
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
@@ -14,20 +54,7 @@ export default async function handler(req: any, res: any) {
 
   try {
     // 1. Embed query
-    const embedRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'models/text-embedding-004',
-          content: { parts: [{ text: query }] }
-        })
-      }
-    );
-    const embedData = await embedRes.json();
-    if (embedData.error) throw new Error(`Embedding Error: ${embedData.error.message}`);
-    const queryEmbedding = embedData.embedding.values;
+    const queryEmbedding = await getEmbedding(query, GEMINI_API_KEY!);
 
     // 2. Similarity search
     const { data: chunks, error: matchError } = await supabase.rpc('match_documents', {
