@@ -1,7 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -25,6 +22,8 @@ export default async function handler(req: any, res: any) {
     const buffer = Buffer.from(await pdfResponse.arrayBuffer());
 
     // 3. Extract text
+    // @ts-ignore
+    const pdfParse = (await import('pdf-parse')).default;
     const data = await pdfParse(buffer);
     const pages = data.text.split('\f')
       .map((text: string, i: number) => ({ page_number: i + 1, text: text.trim() }))
