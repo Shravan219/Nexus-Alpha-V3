@@ -34,7 +34,7 @@ serve(async (req) => {
     // Use Gemini 2.0 Flash to "see" the PDF and extract text
     // This moves the heavy parsing to Google's infra, keeping the Edge Function tiny
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
