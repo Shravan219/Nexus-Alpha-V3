@@ -96,7 +96,7 @@ async function startServer() {
           if (chunkText.trim().length < 20) continue;
 
           const embedRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -142,7 +142,7 @@ async function startServer() {
 
     try {
       const embedRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
