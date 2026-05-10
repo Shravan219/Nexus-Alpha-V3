@@ -4,8 +4,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
-// @ts-ignore
-import pdfParse from "pdf-parse/lib/index.js";
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 import dotenv from "dotenv";
 
 dotenv.config();

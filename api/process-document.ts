@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
-// @ts-ignore
-import pdfParse from "pdf-parse/lib/index.js";
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
