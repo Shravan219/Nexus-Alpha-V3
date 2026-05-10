@@ -4,6 +4,8 @@ import type { Message } from '@/lib/supabase';
 import { Send, Cpu, User, Loader2, Database, Info, RefreshCw, Command, Zap } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -249,8 +251,4 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
       </div>
     </div>
   );
-}
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
 }

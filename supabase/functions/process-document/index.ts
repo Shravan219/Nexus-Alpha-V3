@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import pdfParse from "npm:pdf-parse";
+
+// System prompt for Gemini-based extraction to keep function small
+const EXTRACTION_PROMPT = "Extract all text from this document page by page. Return a JSON array where each object has 'page_number' and 'text'. Format: [{\"page_number\": 1, \"text\": \"...\"}, ...]";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,18 +22,39 @@ serve(async (req) => {
       .update({ status: 'processing' })
       .eq('id', documentId);
 
-    // Download PDF
-    const pdfResponse = await fetch(fileUrl);
-    const buffer = await pdfResponse.arrayBuffer();
+    // Download File (Small files only for this demo, large files should use Gemini File API)
+    const fileResponse = await fetch(fileUrl);
+    const blob = await fileResponse.blob();
+    const base64Buffer = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+      reader.readAsDataURL(blob);
+    });
 
-    // Extract text with pdf-parse
-    const data = await pdfParse(Buffer.from(buffer));
-    const pages = data.text.split('\f')
-      .map((text: string, i: number) => ({
-        page_number: i + 1,
-        text: text.trim()
-      }))
-      .filter((p: any) => p.text.length > 0);
+    // Use Gemini 2.0 Flash to "see" the PDF and extract text
+    // This moves the heavy parsing to Google's infra, keeping the Edge Function tiny
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: EXTRACTION_PROMPT }] },
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: "application/pdf", data: base64Buffer } }
+            ]
+          }],
+          generationConfig: { response_mime_type: "application/json" }
+        })
+      }
+    );
+
+    const geminiData = await geminiRes.json();
+    if (geminiData.error) throw new Error(`Gemini Extraction failed: ${geminiData.error.message}`);
+    
+    const extractionResult = JSON.parse(geminiData.candidates[0].content.parts[0].text);
+    const pages = Array.isArray(extractionResult) ? extractionResult : [];
 
     // Check for existing chunks (idempotency)
     const { count } = await supabase
