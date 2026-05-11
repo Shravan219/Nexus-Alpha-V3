@@ -140,6 +140,7 @@ export default function App() {
             conversationId={activeConversationId} 
             onConversationChange={setActiveConversationId}
             onMessageSent={fetchConversations}
+            employee={currentUser}
           />
         )}
       </main>

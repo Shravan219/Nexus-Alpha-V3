@@ -54,12 +54,14 @@ interface QueryEngineProps {
   conversationId: string | null;
   onConversationChange: (id: string) => void;
   onMessageSent?: () => void;
+  employee: { id: string, name: string, role: string } | null;
 }
 
-export default function QueryEngine({ selectedDocId, conversationId, onConversationChange, onMessageSent }: QueryEngineProps) {
+export default function QueryEngine({ selectedDocId, conversationId, onConversationChange, onMessageSent, employee }: QueryEngineProps) {
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [loadStep, setLoadStep] = useState(0); // 0: idle, 1: nexus appears, 2: neural stream, 3: extracting
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -109,56 +111,81 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
   };
 
   const handleSend = async (e?: React.FormEvent) => {
-    e?.preventDefault();
+    if (e) e.preventDefault();
     if (!query.trim() || isLoading) return;
 
-    let currentConversationId = conversationId;
-    if (!currentConversationId) {
-      currentConversationId = await createConversation();
-    }
-
-    if (!currentConversationId) return;
-
+    setError(null);
     const userQuery = query;
     setQuery('');
-    
-    // Add optimistic user message
-    const tempUserMsg: Message = {
-      id: Math.random().toString(),
-      conversation_id: currentConversationId,
-      role: 'user',
-      content: userQuery,
-      created_at: new Date().toISOString(),
-      employee_id: '' // Optional for UI
-    };
-    setMessages(prev => [...prev, tempUserMsg]);
 
-    setIsLoading(true);
-    setLoadStep(1);
-    
-    // Animate through sequence
-    setTimeout(() => setLoadStep(2), 800);
-    setTimeout(() => setLoadStep(3), 1600);
+    let activeConversationId = conversationId;
 
     try {
-      const response = await authFetch('/api/rag-chat', {
+      setIsLoading(true);
+      setLoadStep(1);
+
+      // Create conversation if none exists
+      if (!activeConversationId) {
+        const convRes = await authFetch('/api/conversations', {
+          method: 'POST',
+          body: JSON.stringify({ title: userQuery.slice(0, 50) })
+        });
+        const convData = await convRes.json();
+        if (convData.id) {
+          activeConversationId = convData.id;
+          onConversationChange(activeConversationId);
+          onMessageSent?.();
+        } else {
+          throw new Error(convData.error || 'Failed to initialize neural link');
+        }
+      }
+
+      // Add optimistic user message
+      const tempUserMsg: Message = {
+        id: `temp-${Date.now()}`,
+        conversation_id: activeConversationId!,
+        role: 'user',
+        content: userQuery,
+        created_at: new Date().toISOString(),
+        employee_id: employee?.id || ''
+      };
+      setMessages(prev => [...prev, tempUserMsg]);
+
+      // Animate steps
+      setTimeout(() => setLoadStep(2), 800);
+      setTimeout(() => setLoadStep(3), 1600);
+
+      const res = await authFetch('/api/rag-chat', {
         method: 'POST',
         body: JSON.stringify({
           query: userQuery,
-          conversationId: currentConversationId,
-          documentId: selectedDocId
+          conversationId: activeConversationId,
+          documentId: selectedDocId || null,
+          employeeId: employee?.id
         })
       });
 
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.error || `Server error: ${response.status}`);
-      }
+      const data = await res.json();
+      console.log('Neural Response:', data);
 
-      await fetchMessages(currentConversationId);
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+
+      // Add assistant response to UI
+      const assistantMsg: Message = {
+        id: `assistant-${Date.now()}`,
+        conversation_id: activeConversationId!,
+        role: 'assistant',
+        content: data.answer,
+        employee_id: employee?.id || '',
+        created_at: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, assistantMsg]);
       onMessageSent?.();
-    } catch (error: any) {
-      toast.error(`Neural Link Failure: ${error.message}`);
+
+    } catch (err: any) {
+      console.error('Nexus Send failed:', err);
+      setError(`Neural Link Failure: ${err.message}`);
+      toast.error(`Neural Link Failure: ${err.message}`);
     } finally {
       setIsLoading(false);
       setLoadStep(0);
@@ -341,19 +368,34 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
       </ScrollArea>
 
       <div className="p-6 pb-12 max-w-3xl mx-auto w-full absolute bottom-0 left-0 right-0 z-30 pointer-events-none bg-gradient-to-t from-black via-black/95 to-transparent">
+        {error && (
+          <div className="mb-4 p-3 bg-red-950/20 border border-red-900/50 rounded-lg text-red-400 text-[10px] font-mono uppercase tracking-widest flex items-center gap-2 pointer-events-auto">
+            <Info size={12} />
+            {error}
+          </div>
+        )}
         <form onSubmit={handleSend} className="relative group pointer-events-auto">
           <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-900/20 to-zinc-800/20 rounded-xl blur opacity-30 group-focus-within:opacity-100 transition-opacity" />
           <input 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && query.trim()) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
             placeholder={selectedDocId ? "Ask the document..." : "Ask the institution..."}
-            className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl py-5 pl-6 pr-16 text-[14px] focus:outline-none focus:border-zinc-700 transition-all shadow-2xl relative placeholder:text-zinc-700"
+            className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl py-5 pl-6 pr-16 text-[14px] focus:outline-none focus:border-zinc-700 transition-all shadow-2xl relative placeholder:text-zinc-700 disabled:opacity-50"
+            disabled={isLoading}
           />
           <button 
             type="submit"
             disabled={!query.trim() || isLoading}
-            className="absolute right-3 top-1/2 -translate-y-1/2 h-11 w-11 flex items-center justify-center rounded-lg bg-white text-black hover:bg-zinc-200 disabled:bg-zinc-900 disabled:text-zinc-700 transition-all shadow-xl"
+            className={cn(
+              "absolute right-3 top-1/2 -translate-y-1/2 h-11 w-11 flex items-center justify-center rounded-lg bg-white text-black hover:bg-zinc-200 disabled:bg-zinc-900 disabled:text-zinc-700 transition-all shadow-xl",
+              (!query.trim() || isLoading) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+            )}
           >
             {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
           </button>
