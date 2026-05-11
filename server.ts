@@ -195,17 +195,19 @@ async function startServer() {
         `[DOC: ${chunk.filename} | Page ${chunk.page_number}]\n${chunk.content}`
       ).join('\n\n') || '';
 
-      const SYSTEM_PROMPT = `You are Nexus, an Institutional Memory Engine. Answer queries ONLY using context provided.
-      
-STRICT OUTPUT GUIDELINES:
-1. NO JSON: Respond only with natural language markdown. Never wrap your response in JSON.
-2. CITATIONS: Use [DOC: filename | Page #]. Use a pipe (|) not a dot.
-3. TONE: Professional and objective.
-4. UNKNOWN: State "Documentation not found in Vault." if the context is insufficient.
-5. CLEANLINESS: Minimal bolding, clean structure.`;
+      const SYSTEM_PROMPT = `You are Nexus, an Institutional Memory Engine. Answer queries using the provided document context.
+
+STRICT FORMATTING RULES:
+1. DO NOT RETURN JSON: Never return a JSON object, code block, or technical metadata. Respond in PLAIN TEXT with Markdown formatting.
+2. CITATIONS: Every claim must include a citation in this EXACT format: [DOC: filename | Page #].
+3. MARKDOWN STRUCTURE: Use clearly separated paragraphs. Use headers (### Header) for sections. Use bullet points for lists.
+4. SPACING: Add double newlines between paragraphs and major sections to ensure readability.
+5. UNKNOWN: If context is missing, say "Documentation not found in Vault."
+
+Respond directly with the content. Avoid prefixing your response with things like "Based on the internal documents..."`;
 
       const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -213,8 +215,13 @@ STRICT OUTPUT GUIDELINES:
             system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
             contents: [{
               role: 'user',
-              parts: [{ text: `CONTEXT:\n${context}\n\nQUESTION: ${query}` }]
-            }]
+              parts: [{ text: `DOCUMENT CONTEXT:\n${context}\n\nUSER QUERY: ${query}` }]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              topP: 0.95,
+              responseMimeType: "text/plain"
+            }
           })
         }
       );

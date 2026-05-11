@@ -123,31 +123,36 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
   };
 
   const renderMessageContent = (content: string) => {
-    // If it looks like JSON, it's a failure mode
-    if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
+    // If it looks like JSON, it's a failure mode - attempt to extract the answer
+    let displayContent = content;
+    if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
       try {
         const parsed = JSON.parse(content);
-        if (parsed.answer) return renderMessageContent(parsed.answer);
+        if (parsed.answer) displayContent = parsed.answer;
+        else if (parsed.content) displayContent = parsed.content;
+        else if (parsed.text) displayContent = parsed.text;
+        else if (parsed.msg) displayContent = parsed.msg;
+        else if (parsed.message) displayContent = parsed.message;
       } catch (e) {
-        // Not actual JSON
+        // Not valid JSON or parsing failed
       }
     }
 
-    // Pre-process citations into unique markdown links
-    // [DOC: file | Page 1] -> [DOC: file | Page 1](cite:file%20|%20Page%201)
-    const processed = content.replace(/\[DOC: ([^\]]+)\]/g, (match, p1) => {
+    // Pre-process citations into unique markdown links for better identification
+    const processed = displayContent.replace(/\[DOC: ([^\]]+)\]/g, (match, p1) => {
       const citeText = `DOC: ${p1}`;
       return `[${citeText}](cite:${encodeURIComponent(p1)})`;
     });
 
     return (
       <div className="prose prose-invert prose-sm max-w-none 
-        prose-p:leading-relaxed prose-p:mb-5 
-        prose-headings:mt-8 prose-headings:mb-4 prose-headings:text-zinc-100 prose-headings:font-semibold
+        prose-p:leading-relaxed prose-p:mb-6 
+        prose-headings:mt-10 prose-headings:mb-4 prose-headings:text-zinc-100 prose-headings:font-semibold
         prose-strong:text-white prose-strong:font-bold
-        prose-ul:my-6 prose-ul:list-disc prose-ul:pl-6
-        prose-li:mb-2 prose-li:marker:text-zinc-600
-        prose-code:text-blue-400 prose-code:bg-zinc-900/50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
+        prose-ul:my-8 prose-ul:list-disc prose-ul:pl-6
+        prose-li:mb-3 prose-li:marker:text-zinc-700
+        prose-code:text-blue-400 prose-code:bg-zinc-900/80 prose-code:px-2 prose-code:py-0.5 prose-code:rounded
+        prose-blockquote:border-l-zinc-800 prose-blockquote:text-zinc-400
         last:prose-p:mb-0"
       >
         <ReactMarkdown 
@@ -157,16 +162,16 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
               if (href?.startsWith('cite:')) {
                 return (
                   <span
-                    className="inline-flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] px-2 py-0.5 rounded-full font-mono mx-1 whitespace-nowrap align-middle hover:border-blue-900/50 hover:text-blue-400 transition-colors cursor-help group/cite select-none"
+                    className="inline-flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] px-2.5 py-1 rounded-full font-mono mx-1.5 whitespace-nowrap align-middle hover:border-blue-900/50 hover:text-blue-400 transition-all cursor-help group/cite select-none shadow-sm"
                     title={decodeURIComponent(href.slice(5))}
                   >
-                    <Database size={10} className="text-zinc-600 group-hover/cite:text-blue-500" />
+                    <Database size={10} className="text-zinc-600 group-hover/cite:text-blue-500 transition-colors" />
                     {children}
                   </span>
                 );
               }
               return (
-                <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline decoration-blue-900/50 underline-offset-4 transition-colors">
+                <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline decoration-blue-900/50 underline-offset-4 transition-colors font-medium">
                   {children}
                 </a>
               );
