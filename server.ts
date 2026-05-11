@@ -104,30 +104,42 @@ async function startServer() {
     }
 
     try {
-      console.log(`[Server] Processing: ${filename}`);
+      console.log(`[Server] Starting process for ${filename} (ID: ${documentId})`);
       
       await supabase.from('documents').update({ status: 'processing', error_message: null }).eq('id', documentId);
 
+      // 1. Download PDF
+      console.log('Step 1: Downloading PDF from:', fileUrl);
       const pdfResponse = await fetch(fileUrl);
       if (!pdfResponse.ok) throw new Error(`Download failed: ${pdfResponse.statusText}`);
       const buffer = Buffer.from(await pdfResponse.arrayBuffer());
+      console.log('Step 1 complete. Buffer size:', buffer.byteLength);
 
+      // 2. Extract text
+      console.log('Step 2: Extracting text using PDFParser...');
       const pages = await extractTextFromPDF(buffer);
+      console.log('Step 2 complete. Pages found:', pages.length);
       
       let chunkIndex = 0;
       let totalChunks = 0;
 
+      // 3. Chunk and Embed
+      console.log('Step 3: Beginning chunking and embedding loop...');
       for (const page of pages) {
         const chunkSize = 1000;
         const overlap = 100;
         const text = page.text;
+        
+        console.log(`Processing page ${page.page_number} (length: ${text.length})`);
 
         for (let i = 0; i < text.length; i += chunkSize - overlap) {
           const chunkText = text.slice(i, i + chunkSize);
           if (chunkText.trim().length < 20) continue;
 
+          console.log(`Generating embedding for chunk ${chunkIndex} (length: ${chunkText.length})`);
           const embedding = await getEmbedding(chunkText, GEMINI_API_KEY!);
 
+          console.log(`Inserting chunk ${chunkIndex} into document_chunks...`);
           const { error: insertError } = await supabase.from('document_chunks').insert({
             document_id: documentId,
             filename,
@@ -145,12 +157,17 @@ async function startServer() {
           totalChunks++;
         }
       }
+      console.log('Step 3 complete. Total chunks processed and inserted:', totalChunks);
 
+      // 4. Mark as ready
+      console.log('Step 4: Finalizing document state to "ready"');
       await supabase.from('documents').update({ status: 'ready', chunk_count: totalChunks }).eq('id', documentId);
+      
+      console.log(`[Server] Successfully processed ${filename}`);
       res.json({ success: true, chunks: totalChunks });
 
     } catch (error: any) {
-      console.error("[Server Error]", error);
+      console.error("PROCESSING FAILED AT STEP:", error);
       await supabase.from('documents').update({ status: 'error', error_message: error.message }).eq('id', documentId);
       res.status(500).json({ error: error.message });
     }
