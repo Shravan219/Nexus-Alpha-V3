@@ -29,7 +29,7 @@ const extractTextFromPDF = (buffer: Buffer): Promise<{page_number: number, text:
 
 const getEmbedding = async (text: string, apiKey: string): Promise<number[]> => {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -538,7 +538,7 @@ STRICT NEGATIVE CONSTRAINT:
 - DO NOT RETURN JSON. Respond ONLY with raw Markdown text.`;
 
       const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
