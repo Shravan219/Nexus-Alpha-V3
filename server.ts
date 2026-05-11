@@ -408,12 +408,29 @@ async function startServer() {
   });
 
   // 2. RAG Chat Logic
-  app.post("/api/rag-chat", authMiddleware, async (req: any, res) => {
-    const { query, conversationId, documentId } = req.body;
-    
-    if (!query) return res.status(400).json({ error: "Missing query" });
-
+  app.post("/api/rag-chat", async (req, res) => {
     try {
+      const { query, conversationId, documentId } = req.body;
+      if (!query) return res.status(400).json({ error: "Missing query" });
+
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      
+      // Get employee if token exists but don't block if it doesn't
+      let employeeId = null;
+
+      if (token) {
+        const { data: session } = await supabase
+          .from('sessions')
+          .select('*, employees(*)')
+          .eq('token', token)
+          .gt('expires_at', new Date().toISOString())
+          .single();
+        
+        if (session) {
+          employeeId = session.employees.employee_id;
+        }
+      }
+
       const queryEmbedding = await getEmbedding(query, GEMINI_API_KEY!);
 
       const { data: chunks, error: matchError } = await supabase.rpc('match_documents', {
@@ -492,15 +509,10 @@ STRICT NEGATIVE CONSTRAINT:
       const geminiData = await geminiRes.json();
       const answer = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
 
-      if (conversationId) {
-        // Get the employeeId from the session (we'll need middleware)
-        const token = req.headers.authorization?.replace('Bearer ', '');
-        const { data: session } = await supabase.from('sessions').select('employee_id').eq('token', token).single();
-        const empId = session?.employee_id;
-
+      if (conversationId && employeeId) {
         await supabase.from('messages').insert([
-          { conversation_id: conversationId, role: 'user', content: query, employee_id: empId },
-          { conversation_id: conversationId, role: 'assistant', content: answer, employee_id: empId }
+          { conversation_id: conversationId, role: 'user', content: query, employee_id: employeeId },
+          { conversation_id: conversationId, role: 'assistant', content: answer, employee_id: employeeId }
         ]);
       }
 
