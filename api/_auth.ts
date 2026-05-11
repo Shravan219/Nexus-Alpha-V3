@@ -26,19 +26,28 @@ export const verifySession = async (req: VercelRequest) => {
 };
 
 export const getEmbedding = async (text: string): Promise<number[]> => {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${process.env.GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'models/gemini-embedding-001',
-        content: { parts: [{ text }] }
-      })
-    }
-  );
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not defined in the environment");
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`;
+  
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      content: { parts: [{ text }] }
+    })
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`Embedding API Error (${res.status}): ${errorBody}`);
+  }
+
   const data = await res.json();
-  if (!data?.embedding?.values) throw new Error(`Embedding failed: ${JSON.stringify(data)}`);
+  if (!data?.embedding?.values) {
+    throw new Error(`Invalid embedding response: ${JSON.stringify(data)}`);
+  }
   return data.embedding.values;
 };
 

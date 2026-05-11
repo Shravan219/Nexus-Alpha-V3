@@ -14,7 +14,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { data: chunks, error: rpcError } = await supabaseAdmin.rpc('match_documents', {
       query_embedding: queryEmbedding,
-      match_count: 4,
+      match_threshold: 0.5,
+      match_count: 8,
       filter_document_id: documentId || null
     });
 
@@ -27,29 +28,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const context = chunks.map((chunk: any) =>
-      `[DOC: ${chunk.filename} · Page ${chunk.page_number}]\n${chunk.content.slice(0, 300)}`
+      `[DOC: ${chunk.filename} · Page ${chunk.page_number}]\n${chunk.content}`
     ).join('\n\n');
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
+    const timeout = setTimeout(() => controller.abort(), 20000);
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{
-            role: 'user',
-            parts: [{ text: `DOCUMENT CONTEXT:\n${context}\n\nQUESTION: ${query}` }]
-          }]
-        })
-      }
-    );
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+
+    const geminiRes = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: [{
+          role: 'user',
+          parts: [{ text: `DOCUMENT CONTEXT:\n${context}\n\nQUESTION: ${query}` }]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          topP: 0.95
+        }
+      })
+    });
 
     clearTimeout(timeout);
+
+    if (!geminiRes.ok) {
+      const errorText = await geminiRes.text();
+      throw new Error(`Gemini Error (${geminiRes.status}): ${errorText}`);
+    }
 
     const geminiData = await geminiRes.json();
     const answer = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
