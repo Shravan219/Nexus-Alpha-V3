@@ -23,6 +23,14 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<{id: string, name: string, role: string} | null>(null);
   const [isVerifying, setIsVerifying] = useState(true);
 
+  // Ping server every 10 minutes to keep it alive
+  useEffect(() => {
+    const ping = () => fetch('/api/ping').catch(() => {});
+    ping(); // ping on load
+    const interval = setInterval(ping, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const fetchDocs = async () => {
     const { data } = await supabase.from('documents').select('*').order('created_at', { ascending: false });
     if (data) setDocuments(data);

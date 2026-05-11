@@ -70,7 +70,11 @@ async function startServer() {
 
   const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
-  // --- DIAGNOSTIC ENDPOINT ---
+  // --- DIAGNOSTIC ENDPOINTS ---
+  app.get('/api/ping', (req, res) => {
+    res.status(200).json({ alive: true });
+  });
+
   app.get("/api/admin/db-check", async (req, res) => {
     try {
       const { data: cols, error: colError } = await supabase
