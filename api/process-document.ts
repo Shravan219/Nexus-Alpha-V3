@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifySession, supabaseAdmin, getEmbedding } from './_auth';
+import { verifySession, getSupabase, getEmbedding } from './_auth';
 import PDFParser from 'pdf2json';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -29,6 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
+  const supabaseAdmin = getSupabase();
   const { documentId, fileUrl, filename } = req.body;
 
   try {

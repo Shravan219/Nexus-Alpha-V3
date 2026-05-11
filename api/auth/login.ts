@@ -1,22 +1,35 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from '../_auth';
+import { getSupabase } from '../_auth';
 import crypto from 'crypto';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORS (Basic)
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
+    const supabaseAdmin = getSupabase();
     const { employeeId } = req.body;
-    if (!employeeId) return res.status(400).json({ success: false, error: 'Employee ID required' });
+    
+    if (!employeeId) {
+      return res.status(400).json({ success: false, error: 'Employee ID required' });
+    }
 
-    const { data: employee } = await supabaseAdmin
+    const { data: employee, error: fetchError } = await supabaseAdmin
       .from('employees')
       .select('*')
       .eq('employee_id', employeeId.trim().toUpperCase())
       .eq('is_active', true)
       .single();
 
-    if (!employee) return res.status(401).json({ success: false, error: 'Invalid Employee ID' });
+    if (fetchError || !employee) {
+      console.error('Login Fetch Error:', fetchError);
+      return res.status(401).json({ success: false, error: 'Invalid or inactive Employee ID' });
+    }
 
     const token = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
@@ -25,7 +38,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from('sessions')
       .insert({ id: token, employee_id: employee.employee_id, expires_at: expiresAt });
 
-    if (sessionError) throw new Error('Failed to create session');
+    if (sessionError) {
+      console.error('Session Creation Error:', sessionError);
+      throw new Error('Failed to create secure session');
+    }
 
     return res.status(200).json({
       success: true,
@@ -37,6 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     });
   } catch (err: any) {
+    console.error('Vercel Login Function Error:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 }

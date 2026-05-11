@@ -1,10 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifySession, supabaseAdmin } from './_auth';
+import { verifySession, getSupabase } from './_auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const employee = await verifySession(req);
   if (!employee) return res.status(401).json({ error: 'Session expired' });
 
+  const supabaseAdmin = getSupabase();
   if (req.method === 'GET') {
     const { data } = await supabaseAdmin
       .from('conversations')

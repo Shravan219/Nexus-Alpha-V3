@@ -1,16 +1,29 @@
 import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest } from '@vercel/node';
 
-export const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+let _supabaseAdmin: any = null;
+
+const getSupabaseAdmin = () => {
+  if (!_supabaseAdmin) {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) {
+      throw new Error("Critical: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required environment variables. Please set them in your Vercel project settings.");
+    }
+    _supabaseAdmin = createClient(url, key);
+  }
+  return _supabaseAdmin;
+};
+
+// Export as a function to ensure it's only called within a request handler
+export const getSupabase = () => getSupabaseAdmin();
 
 export const verifySession = async (req: VercelRequest) => {
+  const supabase = getSupabaseAdmin();
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token || token === 'undefined' || token === 'null') return null;
 
-  const { data: session } = await supabaseAdmin
+  const { data: session } = await supabase
     .from('sessions')
     .select('*, employees(*)')
     .eq('id', token)

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifySession, supabaseAdmin, getEmbedding, SYSTEM_PROMPT } from './_auth';
+import { verifySession, getSupabase, getEmbedding, SYSTEM_PROMPT } from './_auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -7,6 +7,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const employee = await verifySession(req);
   if (!employee) return res.status(401).json({ error: 'Session expired' });
 
+  const supabaseAdmin = getSupabase();
   try {
     const { query, documentId, conversationId } = req.body;
 
@@ -32,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ).join('\n\n');
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const timeout = setTimeout(() => controller.abort(), 8000); // 8s for free tier safety
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
