@@ -40,6 +40,7 @@ create index on document_chunks
 create table conversations (
   id uuid primary key default gen_random_uuid(),
   title text not null default 'New Conversation',
+  employee_id text references employees(employee_id),
   created_at timestamptz default now()
 );
 
@@ -49,7 +50,27 @@ create table messages (
   conversation_id uuid references conversations(id) on delete cascade,
   role text not null check (role in ('user','assistant')),
   content text not null,
+  employee_id text references employees(employee_id),
   created_at timestamptz default now()
+);
+
+-- Employee accounts
+create table employees (
+  id uuid primary key default gen_random_uuid(),
+  employee_id text unique not null,
+  full_name text not null,
+  role text not null default 'employee' check (role in ('admin', 'employee')),
+  is_active boolean default true,
+  created_at timestamptz default now()
+);
+
+-- Sessions table
+create table sessions (
+  id uuid primary key default gen_random_uuid(),
+  employee_id text references employees(employee_id) on delete cascade,
+  token uuid default gen_random_uuid(),
+  created_at timestamptz default now(),
+  expires_at timestamptz default now() + interval '8 hours'
 );
 
 -- Similarity Search Function
@@ -82,6 +103,8 @@ alter table public.document_chunks disable row level security;
 alter table public.documents disable row level security;
 alter table public.messages disable row level security;
 alter table public.conversations disable row level security;
+alter table public.employees disable row level security;
+alter table public.sessions disable row level security;
 ```
 
 # Storage Setup

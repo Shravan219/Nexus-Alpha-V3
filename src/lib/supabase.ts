@@ -23,6 +23,7 @@ export type Document = {
 export type Conversation = {
   id: string;
   title: string;
+  employee_id: string;
   created_at: string;
 };
 
@@ -31,5 +32,6 @@ export type Message = {
   conversation_id: string;
   role: 'user' | 'assistant';
   content: string;
+  employee_id: string;
   created_at: string;
 };

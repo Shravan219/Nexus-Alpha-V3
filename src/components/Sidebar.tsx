@@ -1,5 +1,4 @@
-import React from 'react';
-import { Database, FolderHeart, MessageSquareText, Search, Activity, Cpu } from 'lucide-react';
+import { Database, FolderHeart, Search, Activity, Cpu, Shield, LogOut, User as UserIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Document } from '@/lib/supabase';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -11,19 +10,17 @@ interface SidebarProps {
   documents: Document[];
   selectedDocId: string | null;
   setSelectedDocId: (id: string | null) => void;
+  currentUser: { id: string, name: string, role: string } | null;
+  onLogout: () => void;
 }
 
-export default function Sidebar({ activeTab, setActiveTab, documents, selectedDocId, setSelectedDocId }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, documents, selectedDocId, setSelectedDocId, currentUser, onLogout }: SidebarProps) {
   return (
     <aside className="w-72 bg-[#0a0a0a] border-r border-[#1a1a1a] flex flex-col h-full">
       <div className="p-6 border-b border-[#1a1a1a] flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="h-8 w-[3px] bg-blue-600" />
           <h1 className="text-xl font-bold tracking-tighter text-white">NEXUS ALPHA</h1>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-[10px] font-mono text-green-500/80 tracking-widest">STABLE</span>
         </div>
       </div>
 
@@ -46,6 +43,14 @@ export default function Sidebar({ activeTab, setActiveTab, documents, selectedDo
           active={activeTab === 'query'} 
           onClick={() => setActiveTab('query')} 
         />
+        {currentUser?.role === 'admin' && (
+          <SidebarNavItem 
+            icon={<Shield size={18} />} 
+            label="GOVERNANCE" 
+            active={activeTab === 'admin'} 
+            onClick={() => setActiveTab('admin')} 
+          />
+        )}
       </nav>
 
       <div className="mt-8 flex-1 flex flex-col overflow-hidden">
@@ -103,10 +108,26 @@ export default function Sidebar({ activeTab, setActiveTab, documents, selectedDo
         </ScrollArea>
       </div>
 
-      <div className="p-4 border-t border-[#1a1a1a]">
-        <div className="flex items-center justify-between px-2">
-          <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">v2.5.0-STABLE</p>
-          <div className="h-1 w-1 rounded-full bg-green-500/50" />
+      <div className="p-4 border-t border-[#1a1a1a] bg-zinc-950/50">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-8 w-8 rounded bg-zinc-900 flex items-center justify-center text-zinc-400">
+            <UserIcon size={14} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-bold text-white truncate">{currentUser?.name}</p>
+            <p className="text-[9px] text-zinc-500 font-mono truncate uppercase tracking-tighter">{currentUser?.id}</p>
+          </div>
+          <button 
+            onClick={onLogout}
+            className="p-1.5 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded transition-all"
+            title="Terminate Session"
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
+        <div className="flex items-center justify-between px-2 pt-2 border-t border-zinc-900">
+          <p className="text-[9px] font-mono text-zinc-700 uppercase tracking-widest">v2.5.0-STABLE</p>
+          {currentUser?.role === 'admin' && <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-[8px] h-3 px-1 font-mono">ADM</Badge>}
         </div>
       </div>
     </aside>

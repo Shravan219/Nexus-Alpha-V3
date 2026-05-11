@@ -77,6 +77,172 @@ async function startServer() {
 
   const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
+  // --- AUTH ENDPOINTS ---
+
+  app.post("/api/auth/login", async (req, res) => {
+    const { employeeId } = req.body;
+    if (!employeeId) return res.status(400).json({ error: "Missing Employee ID" });
+
+    try {
+      // 1. Verify employee exists and is active
+      const { data: employee, error: empError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('is_active', true)
+        .single();
+
+      if (empError || !employee) {
+        return res.status(401).json({ error: "Invalid Employee ID or account inactive" });
+      }
+
+      // 2. Create session
+      const { data: session, error: sessError } = await supabase
+        .from('sessions')
+        .insert({ employee_id: employeeId })
+        .select()
+        .single();
+
+      if (sessError) throw sessError;
+
+      res.json({
+        success: true,
+        token: session.token,
+        employee: {
+          id: employee.employee_id,
+          name: employee.full_name,
+          role: employee.role
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/auth/verify", async (req, res) => {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) return res.status(401).json({ error: "Missing token" });
+
+    try {
+      // Check session
+      const { data: session, error: sessError } = await supabase
+        .from('sessions')
+        .select('*, employees(*)')
+        .eq('token', token)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+
+      if (sessError || !session || !session.employees) {
+        return res.status(401).json({ error: "Invalid or expired session" });
+      }
+
+      const employee = session.employees;
+      res.json({
+        success: true,
+        employee: {
+          id: employee.employee_id,
+          name: employee.full_name,
+          role: employee.role
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/auth/logout", async (req, res) => {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      await supabase.from('sessions').delete().eq('token', token);
+    }
+    res.json({ success: true });
+  });
+
+  // --- AUTH MIDDLEWARE ---
+  const authMiddleware = async (req: any, res: any, next: any) => {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+    const { data: session, error } = await supabase
+      .from('sessions')
+      .select('*, employees(*)')
+      .eq('token', token)
+      .gt('expires_at', new Date().toISOString())
+      .single();
+
+    if (error || !session || !session.employees) {
+      return res.status(401).json({ error: "Session expired or invalid" });
+    }
+
+    req.employee = session.employees;
+    next();
+  };
+
+  const adminMiddleware = (req: any, res: any, next: any) => {
+    if (req.employee.role !== 'admin') {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    next();
+  };
+
+  // --- EMPLOYEE MANAGEMENT ---
+  app.get("/api/employees", authMiddleware, adminMiddleware, async (req, res) => {
+    const { data, error } = await supabase.from('employees').select('*').order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  });
+
+  app.post("/api/employees", authMiddleware, adminMiddleware, async (req, res) => {
+    const { employeeId, fullName, role } = req.body;
+    const { data, error } = await supabase.from('employees').insert({ employee_id: employeeId, full_name: fullName, role }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  });
+
+  app.patch("/api/employees/:id", authMiddleware, adminMiddleware, async (req, res) => {
+    const { isActive } = req.body;
+    const { data, error } = await supabase.from('employees').update({ is_active: isActive }).eq('employee_id', req.params.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  });
+
+  app.delete("/api/employees/:id", authMiddleware, adminMiddleware, async (req, res) => {
+    const { error } = await supabase.from('employees').delete().eq('employee_id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  });
+
+  // --- CONVERSATION ROUTES ---
+  app.get("/api/conversations", authMiddleware, async (req: any, res) => {
+    let query = supabase.from('conversations').select('*').order('created_at', { ascending: false });
+    if (req.employee.role !== 'admin') {
+      query = query.eq('employee_id', req.employee.employee_id);
+    }
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  });
+
+  app.post("/api/conversations", authMiddleware, async (req: any, res) => {
+    const { title } = req.body;
+    const { data, error } = await supabase.from('conversations').insert({ 
+      title: title || 'New Conversation',
+      employee_id: req.employee.employee_id 
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  });
+
+  app.get("/api/conversations/:id/messages", authMiddleware, async (req: any, res) => {
+    const { data: conv } = await supabase.from('conversations').select('employee_id').eq('id', req.params.id).single();
+    if (req.employee.role !== 'admin' && conv?.employee_id !== req.employee.employee_id) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    const { data, error } = await supabase.from('messages').select('*').eq('conversation_id', req.params.id).order('created_at', { ascending: true });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  });
+
   // --- API ROUTES ---
 
   app.get("/api/health", (req, res) => {
@@ -96,7 +262,7 @@ async function startServer() {
   });
 
   // 1. Process Document Logic
-  app.post("/api/process-document", async (req, res) => {
+  app.post("/api/process-document", authMiddleware, adminMiddleware, async (req, res) => {
     const { documentId, fileUrl, filename } = req.body;
     
     if (!documentId || !fileUrl) {
@@ -174,7 +340,7 @@ async function startServer() {
   });
 
   // 2. RAG Chat Logic
-  app.post("/api/rag-chat", async (req, res) => {
+  app.post("/api/rag-chat", authMiddleware, async (req: any, res) => {
     const { query, conversationId, documentId } = req.body;
     
     if (!query) return res.status(400).json({ error: "Missing query" });
@@ -256,12 +422,17 @@ STRICT NEGATIVE CONSTRAINT:
       }
 
       const geminiData = await geminiRes.json();
-      const answer = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated (Response structure: ' + JSON.stringify(geminiData) + ')';
+      const answer = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
 
       if (conversationId) {
+        // Get the employeeId from the session (we'll need middleware)
+        const token = req.headers.authorization?.replace('Bearer ', '');
+        const { data: session } = await supabase.from('sessions').select('employee_id').eq('token', token).single();
+        const empId = session?.employee_id;
+
         await supabase.from('messages').insert([
-          { conversation_id: conversationId, role: 'user', content: query },
-          { conversation_id: conversationId, role: 'assistant', content: answer }
+          { conversation_id: conversationId, role: 'user', content: query, employee_id: empId },
+          { conversation_id: conversationId, role: 'assistant', content: answer, employee_id: empId }
         ]);
       }
 

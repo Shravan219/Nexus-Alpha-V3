@@ -52,9 +52,10 @@ interface QueryEngineProps {
   selectedDocId: string | null;
   conversationId: string | null;
   onConversationChange: (id: string) => void;
+  onMessageSent?: () => void;
 }
 
-export default function QueryEngine({ selectedDocId, conversationId, onConversationChange }: QueryEngineProps) {
+export default function QueryEngine({ selectedDocId, conversationId, onConversationChange, onMessageSent }: QueryEngineProps) {
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -79,15 +80,35 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
   }, [messages, loadStep]);
 
   const fetchMessages = async (id: string) => {
-    const { data } = await supabase.from('messages').select('*').eq('conversation_id', id).order('created_at', { ascending: true });
-    if (data) setMessages(data);
+    try {
+      const res = await fetch(`/api/conversations/${id}/messages`, {
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('nexus_token')}` }
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) setMessages(data);
+    } catch (err) {
+      toast.error('Failed to reconstruct conversation history');
+    }
   };
 
   const createConversation = async () => {
-    const { data } = await supabase.from('conversations').insert({ title: query.slice(0, 30) || 'New Inquiry' }).select().single();
-    if (data) {
-      onConversationChange(data.id);
-      return data.id;
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionStorage.getItem('nexus_token')}` 
+        },
+        body: JSON.stringify({ title: query.slice(0, 30) || 'New Inquiry' })
+      });
+      const data = await res.json();
+      if (data.id) {
+        onConversationChange(data.id);
+        onMessageSent?.();
+        return data.id;
+      }
+    } catch (err) {
+      toast.error('Conversation initialization failed');
     }
     return null;
   };
@@ -95,6 +116,9 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!query.trim() || isLoading) return;
+
+    const token = sessionStorage.getItem('nexus_token');
+    if (!token) return toast.error('Security token missing. Please re-authenticate.');
 
     let currentConversationId = conversationId;
     if (!currentConversationId) {
@@ -112,7 +136,8 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
       conversation_id: currentConversationId,
       role: 'user',
       content: userQuery,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      employee_id: '' // Optional for UI
     };
     setMessages(prev => [...prev, tempUserMsg]);
 
@@ -127,7 +152,8 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
       const response = await fetch('/api/rag-chat', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           query: userQuery,
@@ -137,20 +163,12 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
       });
 
       if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const result = await response.json();
-          throw new Error(result.error || `Server error: ${response.status}`);
-        } else {
-          const text = await response.text();
-          console.error("Server returned non-JSON:", text);
-          throw new Error(`Server returned HTML/Text (Error ${response.status}). Check console.`);
-        }
+        const result = await response.json();
+        throw new Error(result.error || `Server error: ${response.status}`);
       }
 
-      const result = await response.json();
-
       await fetchMessages(currentConversationId);
+      onMessageSent?.();
     } catch (error: any) {
       toast.error(`Neural Link Failure: ${error.message}`);
     } finally {

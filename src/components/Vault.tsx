@@ -14,9 +14,10 @@ import { toast } from 'sonner';
 interface VaultProps {
   documents: Document[];
   onRefresh: () => void;
+  isAdmin?: boolean;
 }
 
-export default function Vault({ documents, onRefresh }: VaultProps) {
+export default function Vault({ documents, onRefresh, isAdmin = false }: VaultProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [pasteTitle, setPasteTitle] = useState('');
@@ -27,7 +28,8 @@ export default function Vault({ documents, onRefresh }: VaultProps) {
       const response = await fetch('/api/process-document', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionStorage.getItem('nexus_token')}`
         },
         body: JSON.stringify({
           documentId: docId,
@@ -153,44 +155,46 @@ export default function Vault({ documents, onRefresh }: VaultProps) {
           <p className="text-zinc-500 font-mono text-sm tracking-widest uppercase">Institutional Library & Data Sovereignty</p>
         </div>
         <div className="flex gap-3">
-          <Dialog open={isPasteOpen} onOpenChange={setIsPasteOpen}>
-            <DialogTrigger 
-              render={
-                <Button variant="outline" className="bg-zinc-950 border-zinc-900 hover:bg-zinc-900 gap-2 h-10 px-4 font-mono text-[10px] tracking-widest uppercase">
-                  <PlusCircle size={14} />
-                  PASTE PROTOCOL
-                </Button>
-              }
-            />
-            <DialogContent className="bg-zinc-950 border-zinc-900 text-white max-w-2xl">
-              <DialogHeader>
-                <DialogTitle className="font-mono tracking-widest uppercase text-sm">Direct Data Ingest</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase">Document Title</label>
-                  <input 
-                    value={pasteTitle}
-                    onChange={(e) => setPasteTitle(e.target.value)}
-                    className="w-full bg-black border border-zinc-900 rounded-md p-2 text-sm focus:outline-none focus:border-blue-600 transition-colors"
-                    placeholder="Engineering-SOP-V1"
-                  />
+          {isAdmin && (
+            <Dialog open={isPasteOpen} onOpenChange={setIsPasteOpen}>
+              <DialogTrigger 
+                render={
+                  <Button variant="outline" className="bg-zinc-950 border-zinc-900 hover:bg-zinc-900 gap-2 h-10 px-4 font-mono text-[10px] tracking-widest uppercase">
+                    <PlusCircle size={14} />
+                    PASTE PROTOCOL
+                  </Button>
+                }
+              />
+              <DialogContent className="bg-zinc-950 border-zinc-900 text-white max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle className="font-mono tracking-widest uppercase text-sm">Direct Data Ingest</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase">Document Title</label>
+                    <input 
+                      value={pasteTitle}
+                      onChange={(e) => setPasteTitle(e.target.value)}
+                      className="w-full bg-black border border-zinc-900 rounded-md p-2 text-sm focus:outline-none focus:border-blue-600 transition-colors"
+                      placeholder="Engineering-SOP-V1"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase">Plaintext / Markdown Content</label>
+                    <textarea 
+                      value={pasteText}
+                      onChange={(e) => setPasteText(e.target.value)}
+                      className="w-full bg-black border border-zinc-900 rounded-md p-4 text-sm focus:outline-none focus:border-blue-600 transition-colors min-h-[300px] font-mono"
+                      placeholder="Paste the raw institutional weights here..."
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase">Plaintext / Markdown Content</label>
-                  <textarea 
-                    value={pasteText}
-                    onChange={(e) => setPasteText(e.target.value)}
-                    className="w-full bg-black border border-zinc-900 rounded-md p-4 text-sm focus:outline-none focus:border-blue-600 transition-colors min-h-[300px] font-mono"
-                    placeholder="Paste the raw institutional weights here..."
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleManualIngest} className="bg-white text-black hover:bg-zinc-200">INITIATE INGEST</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <DialogFooter>
+                  <Button onClick={handleManualIngest} className="bg-white text-black hover:bg-zinc-200">INITIATE INGEST</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
           
           <Button onClick={onRefresh} variant="outline" size="icon" className="bg-zinc-950 border-zinc-900">
             <RefreshCw size={14} />
@@ -199,25 +203,27 @@ export default function Vault({ documents, onRefresh }: VaultProps) {
       </div>
 
       <div className="grid grid-cols-1 gap-8">
-        <Card className="bg-[#0a0a0a] border-[#1a1a1a] border-dashed">
-          <CardContent className="p-0">
-            <div 
-              {...getRootProps()} 
-              className={`p-16 text-center cursor-pointer transition-all ${isDragActive ? 'bg-blue-600/5 border-blue-600' : 'hover:bg-zinc-900/40'}`}
-            >
-              <input {...getInputProps()} />
-              <div className="flex flex-col items-center gap-4">
-                <div className="h-16 w-16 rounded-full bg-zinc-950 border border-zinc-900 flex items-center justify-center">
-                  {isUploading ? <Loader2 className="animate-spin text-blue-500" size={32} /> : <Upload className="text-zinc-500" size={32} />}
-                </div>
-                <div>
-                  <p className="text-lg font-bold tracking-tight">INGEST PIPELINE</p>
-                  <p className="text-zinc-500 text-sm mt-1">Drop institutional weights (PDF, TXT, MD) or click to browse</p>
+        {isAdmin && (
+          <Card className="bg-[#0a0a0a] border-[#1a1a1a] border-dashed">
+            <CardContent className="p-0">
+              <div 
+                {...getRootProps()} 
+                className={`p-16 text-center cursor-pointer transition-all ${isDragActive ? 'bg-blue-600/5 border-blue-600' : 'hover:bg-zinc-900/40'}`}
+              >
+                <input {...getInputProps()} />
+                <div className="flex flex-col items-center gap-4">
+                  <div className="h-16 w-16 rounded-full bg-zinc-950 border border-zinc-900 flex items-center justify-center">
+                    {isUploading ? <Loader2 className="animate-spin text-blue-500" size={32} /> : <Upload className="text-zinc-500" size={32} />}
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold tracking-tight">INGEST PIPELINE</p>
+                    <p className="text-zinc-500 text-sm mt-1">Drop institutional weights (PDF, TXT, MD) or click to browse</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="bg-[#0a0a0a] border-[#1a1a1a] text-white">
           <CardHeader className="border-b border-[#1a1a1a]">
@@ -259,14 +265,16 @@ export default function Vault({ documents, onRefresh }: VaultProps) {
                             {doc.error_message}
                           </div>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-zinc-500 hover:text-red-500 hover:bg-red-500/10"
-                          onClick={() => deleteDocument(doc)}
-                        >
-                          <Trash2 size={16} />
-                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-zinc-500 hover:text-red-500 hover:bg-red-500/10"
+                            onClick={() => deleteDocument(doc)}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
