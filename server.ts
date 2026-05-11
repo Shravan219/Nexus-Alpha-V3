@@ -102,7 +102,7 @@ async function startServer() {
       const { data: session, error } = await supabase
         .from('sessions')
         .select('*, employees(*)')
-        .eq('token', token)
+        .eq('id', token)
         .gt('expires_at', new Date().toISOString())
         .single();
 
@@ -126,49 +126,62 @@ async function startServer() {
 
   // --- AUTH ENDPOINTS ---
 
-  app.post("/api/auth/login", async (req, res) => {
-    const { employeeId } = req.body;
-    if (!employeeId) return res.status(400).json({ error: "Missing Employee ID" });
-
+  app.post('/api/auth/login', async (req, res) => {
     try {
-      // 1. Verify employee exists and is active
+      const { employeeId } = req.body;
+
+      if (!employeeId) {
+        return res.status(400).json({ success: false, error: 'Employee ID required' });
+      }
+
+      // Check employee exists and is active
       const { data: employee, error: empError } = await supabase
         .from('employees')
         .select('*')
-        .eq('employee_id', employeeId)
+        .eq('employee_id', employeeId.trim().toUpperCase())
         .eq('is_active', true)
         .single();
 
       if (empError || !employee) {
-        return res.status(401).json({ error: "Invalid Employee ID or account inactive" });
+        return res.status(401).json({ success: false, error: 'Invalid Employee ID' });
       }
 
-      // 2. Create session
-      const { data: session, error: sessError } = await supabase
+      // Generate token
+      const { randomUUID } = await import('crypto');
+      const token = randomUUID();
+
+      // Insert session
+      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+      const { error: sessionError } = await supabase
         .from('sessions')
-        .insert({ employee_id: employeeId })
-        .select('*')
-        .single();
+        .insert({
+          id: token,
+          employee_id: employee.employee_id,
+          expires_at: expiresAt
+        });
 
-      if (sessError) {
-        console.error('Session creation error:', sessError);
-        throw sessError;
+      if (sessionError) {
+        console.error('Session insert error:', sessionError);
+        return res.status(500).json({ success: false, error: 'Failed to create session' });
       }
 
-      console.log('Session created successfully:', JSON.stringify(session));
-
-      return res.status(200).json({
+      // Return token explicitly at top level
+      const responseBody = {
         success: true,
-        token: session.token,
+        token: token,
         employee: {
           id: employee.employee_id,
           name: employee.full_name,
           role: employee.role
         }
-      });
-    } catch (error: any) {
-      console.error('Login processing error:', error.message);
-      res.status(500).json({ error: error.message });
+      };
+
+      console.log('Login successful. Response:', JSON.stringify(responseBody));
+      return res.status(200).json(responseBody);
+
+    } catch (err: any) {
+      console.error('Login error:', err);
+      return res.status(500).json({ success: false, error: err.message });
     }
   });
 
@@ -187,7 +200,7 @@ async function startServer() {
   app.post("/api/auth/logout", async (req, res) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (token) {
-      await supabase.from('sessions').delete().eq('token', token);
+      await supabase.from('sessions').delete().eq('id', token);
     }
     res.json({ success: true });
   });

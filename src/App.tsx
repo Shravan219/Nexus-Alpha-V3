@@ -5,7 +5,7 @@ import Sidebar from '@/components/Sidebar';
 import Dashboard from '@/components/Dashboard';
 import Vault from '@/components/Vault';
 import QueryEngine from '@/components/QueryEngine';
-import Login from '@/components/Login';
+import { Login } from '@/components/Login';
 import AdminPanel from '@/components/AdminPanel';
 import { Toaster, toast } from 'sonner';
 import { authFetch } from '@/lib/api';
@@ -64,9 +64,7 @@ export default function App() {
     }
   };
 
-  const handleLogin = (token: string, employee: any) => {
-    sessionStorage.setItem(SESSION_TOKEN_KEY, token);
-    sessionStorage.setItem(SESSION_EMPLOYEE_KEY, JSON.stringify(employee));
+  const handleLogin = (employee: any) => {
     setIsLoggedIn(true);
     setCurrentUser(employee);
     toast.success(`Welcome back, Agent ${employee.name}`);
