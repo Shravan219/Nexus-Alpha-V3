@@ -27,7 +27,7 @@ create table document_chunks (
   page_number int not null,
   chunk_index int not null,
   content text not null,
-  embedding vector(768),
+  embedding vector(3072),
   created_at timestamptz default now()
 );
 
@@ -54,7 +54,7 @@ create table messages (
 
 -- Similarity Search Function
 create or replace function match_documents(
-  query_embedding vector(768),
+  query_embedding vector(3072),
   match_threshold float,
   match_count int,
   filter_document_id uuid default null
