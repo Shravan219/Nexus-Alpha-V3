@@ -1,15 +1,37 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Message } from '@/lib/supabase';
-import { Send, Cpu, User, Loader2, Database, Info, RefreshCw, Command, Zap } from 'lucide-react';
+import { Send, Cpu, User, Loader2, Info, RefreshCw, Command, Zap } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+
+const CitationPill = ({ text }: { text: string }) => (
+  <span className="inline-flex items-center bg-zinc-900 border border-zinc-700 text-zinc-400 text-xs px-2 py-0.5 rounded font-mono mx-1 whitespace-nowrap align-middle">
+    {text}
+  </span>
+);
+
+const processChildren = (children: any, citations: string[]): any => {
+  if (typeof children === 'string') {
+    const parts = children.split(/(%%CITATION_\d+%%)/g);
+    return parts.map((part, i) => {
+      const match = part.match(/%%CITATION_(\d+)%%/);
+      if (match) {
+        return <CitationPill key={i} text={citations[parseInt(match[1])]} />;
+      }
+      return part;
+    });
+  }
+  if (Array.isArray(children)) {
+    return children.map((child, i) => <React.Fragment key={i}>{processChildren(child, citations)}</React.Fragment>);
+  }
+  return children;
+};
 
 interface QueryEngineProps {
   selectedDocId: string | null;
@@ -123,59 +145,39 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
   };
 
   const renderMessageContent = (content: string) => {
-    // If it looks like JSON, it's a failure mode - attempt to extract the answer
-    let displayContent = content;
-    if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
-      try {
-        const parsed = JSON.parse(content);
-        if (parsed.answer) displayContent = parsed.answer;
-        else if (parsed.content) displayContent = parsed.content;
-        else if (parsed.text) displayContent = parsed.text;
-        else if (parsed.msg) displayContent = parsed.msg;
-        else if (parsed.message) displayContent = parsed.message;
-      } catch (e) {
-        // Not valid JSON or parsing failed
+    // Split content by citation tags
+    const parts = content.split(/(\[DOC:[^\]]+\])/g);
+    
+    // Reconstruct content replacing citations with placeholder tokens
+    const citations: string[] = [];
+    const processed = parts.map(part => {
+      if (part.match(/^\[DOC:.+\]$/)) {
+        citations.push(part.slice(1, -1));
+        return `%%CITATION_${citations.length - 1}%%`;
       }
-    }
+      return part;
+    }).join('');
 
-    // Pre-process citations into unique markdown links for better identification
-    const processed = displayContent.replace(/\[DOC: ([^\]]+)\]/g, (match, p1) => {
-      const citeText = `DOC: ${p1}`;
-      return `[${citeText}](cite:${encodeURIComponent(p1)})`;
-    });
-
+    // Render with ReactMarkdown then replace placeholders with pills
     return (
-      <div className="prose prose-invert prose-sm max-w-none 
-        prose-p:leading-relaxed prose-p:mb-6 
-        prose-headings:mt-10 prose-headings:mb-4 prose-headings:text-zinc-100 prose-headings:font-semibold
-        prose-strong:text-white prose-strong:font-bold
-        prose-ul:my-8 prose-ul:list-disc prose-ul:pl-6
-        prose-li:mb-3 prose-li:marker:text-zinc-700
-        prose-code:text-blue-400 prose-code:bg-zinc-900/80 prose-code:px-2 prose-code:py-0.5 prose-code:rounded
-        prose-blockquote:border-l-zinc-800 prose-blockquote:text-zinc-400
-        last:prose-p:mb-0"
-      >
-        <ReactMarkdown 
-          remarkPlugins={[remarkGfm]}
+      <div className="prose prose-invert prose-sm max-w-none prose-p:my-2 prose-li:my-0.5 prose-headings:my-3 prose-headings:font-semibold prose-strong:text-white prose-code:text-zinc-300 prose-code:bg-zinc-800 prose-code:px-1 prose-code:rounded">
+        <ReactMarkdown
           components={{
-            a: ({ href, children }) => {
-              if (href?.startsWith('cite:')) {
-                return (
-                  <span
-                    className="inline-flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] px-2.5 py-1 rounded-full font-mono mx-1.5 whitespace-nowrap align-middle hover:border-blue-900/50 hover:text-blue-400 transition-all cursor-help group/cite select-none shadow-sm"
-                    title={decodeURIComponent(href.slice(5))}
-                  >
-                    <Database size={10} className="text-zinc-600 group-hover/cite:text-blue-500 transition-colors" />
-                    {children}
-                  </span>
-                );
-              }
-              return (
-                <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline decoration-blue-900/50 underline-offset-4 transition-colors font-medium">
-                  {children}
-                </a>
-              );
-            }
+            p: ({ children }) => (
+              <p className="my-2 leading-relaxed">
+                {processChildren(children, citations)}
+              </p>
+            ),
+            li: ({ children }) => (
+              <li className="my-1">
+                {processChildren(children, citations)}
+              </li>
+            ),
+            strong: ({ children }) => (
+              <strong className="font-semibold text-white">
+                {processChildren(children, citations)}
+              </strong>
+            ),
           }}
         >
           {processed}
