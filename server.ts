@@ -89,16 +89,42 @@ async function startServer() {
 
   const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
+  // --- DIAGNOSTIC ENDPOINT ---
+  app.get("/api/admin/db-check", async (req, res) => {
+    try {
+      const { data: cols, error: colError } = await supabase
+        .rpc('get_table_columns', { table_name_input: 'sessions' });
+      
+      if (colError) {
+        // Fallback if RPC doesn't exist
+        const { data: fallback, error: fallbackError } = await supabase
+          .from('sessions')
+          .select('*')
+          .limit(1);
+        
+        return res.json({ 
+          error: colError.message, 
+          fallback_sample: fallback?.[0] ? Object.keys(fallback[0]) : 'No data',
+          hint: "Try running: SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'sessions';"
+        });
+      }
+      res.json(cols);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // --- AUTH MIDDLEWARE ---
   const authMiddleware = async (req: any, res: any, next: any) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
-    console.log(`[Auth] Path: ${req.url}, Token received: ${token ? (token.slice(0, 8) + '...') : 'NONE'}`);
     
-    if (!token || token === 'undefined') {
+    if (!token || token === 'undefined' || token === 'null') {
+      console.log(`[Auth] Rejected: No token provided for ${req.url}`);
       return res.status(401).json({ error: "Session expired or invalid" });
     }
 
     try {
+      console.log(`[Auth] Verifying session: ${token.slice(0, 8)}...`);
       const { data: session, error } = await supabase
         .from('sessions')
         .select('*, employees(*)')
@@ -106,13 +132,21 @@ async function startServer() {
         .gt('expires_at', new Date().toISOString())
         .single();
 
-      if (error || !session || !session.employees) {
+      if (error) {
+        console.error(`[Auth] Session lookup error:`, error.message);
         return res.status(401).json({ error: "Session expired or invalid" });
       }
 
+      if (!session || !session.employees) {
+        console.warn(`[Auth] Session not found or employee missing for token: ${token.slice(0, 8)}...`);
+        return res.status(401).json({ error: "Session expired or invalid" });
+      }
+
+      console.log(`[Auth] Success: ${session.employees.full_name} (${session.employees.role})`);
       req.employee = session.employees;
       next();
-    } catch (err) {
+    } catch (err: any) {
+      console.error(`[Auth] Unexpected error:`, err.message);
       return res.status(401).json({ error: "Session expired or invalid" });
     }
   };
@@ -241,7 +275,7 @@ async function startServer() {
       const { data: session, error: sessionError } = await supabase
         .from('sessions')
         .select('*, employees(*)')
-        .eq('token', token) // Using 'token' column as per existing middleware
+        .eq('id', token)
         .gt('expires_at', new Date().toISOString())
         .single();
 
@@ -284,7 +318,7 @@ async function startServer() {
       const { data: session, error: sessionError } = await supabase
         .from('sessions')
         .select('*, employees(*)')
-        .eq('token', token)
+        .eq('id', token)
         .gt('expires_at', new Date().toISOString())
         .single();
 
@@ -445,7 +479,7 @@ async function startServer() {
         const { data: session } = await supabase
           .from('sessions')
           .select('*, employees(*)')
-          .eq('token', token)
+          .eq('id', token)
           .gt('expires_at', new Date().toISOString())
           .single();
         
