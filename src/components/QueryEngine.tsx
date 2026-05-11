@@ -121,6 +121,29 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
     }
   };
 
+  const renderMessageContent = (content: string) => {
+    const parts = content.split(/(\[DOC:[^\]]+\])/g);
+    return parts.map((part, index) => {
+      if (part.match(/^\[DOC:.+\]$/)) {
+        return (
+          <span
+            key={index}
+            className="inline-flex items-center bg-zinc-900 border border-zinc-700 text-zinc-400 text-xs px-2 py-0.5 rounded font-mono mx-1 whitespace-nowrap align-middle"
+          >
+            {part.slice(5, -1)}
+          </span>
+        );
+      }
+      return (
+        <span key={index} className="inline prose prose-invert prose-sm max-w-none prose-p:inline prose-p:m-0">
+          <ReactMarkdown>
+            {part}
+          </ReactMarkdown>
+        </span>
+      );
+    });
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-black relative overflow-hidden">
       <header className="p-4 border-b border-[#1a1a1a] flex items-center justify-between bg-black/50 backdrop-blur-md z-10">
@@ -180,28 +203,13 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
                   ? "bg-zinc-900/40 border-zinc-800 text-white" 
                   : "bg-transparent border-transparent text-white"
               )}>
-                <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-zinc-950 prose-code:text-blue-400">
-                  <ReactMarkdown 
-                    components={{
-                      p: ({children}) => {
-                        // Rough regex for citation pills in markdown
-                        if (typeof children === 'string') {
-                          const parts = (children as string).split(/(\[DOC:.*?\])/);
-                          return (
-                            <p>{parts.map((part, i) => 
-                              part.startsWith('[DOC:') 
-                                ? <span key={i} className="citation-pill">{part.replace('[DOC:', '').replace(']', '').trim()}</span>
-                                : part
-                            )}</p>
-                          );
-                        }
-                        return <p>{children}</p>;
-                      }
-                    }}
-                  >
-                    {msg.content}
-                  </ReactMarkdown>
-                </div>
+                {msg.role === 'user' ? (
+                  <div className="text-sm leading-relaxed">{msg.content}</div>
+                ) : (
+                  <div className="prose prose-invert prose-sm max-w-none">
+                    {renderMessageContent(msg.content)}
+                  </div>
+                )}
                 {msg.role === 'assistant' && (
                   <div className="mt-8 pt-4 border-t border-zinc-900 flex items-center gap-2 text-[10px] font-mono text-zinc-600 tracking-tighter uppercase">
                     <Zap size={10} className="text-yellow-500" />
