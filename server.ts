@@ -203,24 +203,88 @@ async function startServer() {
   });
 
   // --- CONVERSATION ROUTES ---
-  app.get("/api/conversations", authMiddleware, async (req: any, res) => {
-    let query = supabase.from('conversations').select('*').order('created_at', { ascending: false });
-    if (req.employee.role !== 'admin') {
-      query = query.eq('employee_id', req.employee.employee_id);
+  app.get("/api/conversations", async (req, res) => {
+    try {
+      console.log('=== CONVERSATIONS GET ENDPOINT ===');
+      console.log('Authorization header:', req.headers.authorization);
+
+      const token = req.headers.authorization?.replace('Bearer ', '');
+
+      if (!token) {
+        console.log('No token provided');
+        return res.status(200).json([]);
+      }
+
+      const { data: session, error: sessionError } = await supabase
+        .from('sessions')
+        .select('*, employees(*)')
+        .eq('token', token) // Using 'token' column as per existing middleware
+        .gt('expires_at', new Date().toISOString())
+        .single();
+
+      console.log('Session:', JSON.stringify(session));
+      if (sessionError) console.log('Session error:', JSON.stringify(sessionError));
+
+      if (!session || !session.employees) {
+        console.log('No valid session or employee found');
+        return res.status(200).json([]);
+      }
+
+      let query = supabase.from('conversations').select('*').order('created_at', { ascending: false });
+      
+      if (session.employees.role !== 'admin') {
+        query = query.eq('employee_id', session.employees.employee_id);
+      }
+
+      const { data: conversations, error } = await query;
+
+      console.log('Conversations count:', conversations?.length || 0);
+      if (error) console.log('Conversations error:', JSON.stringify(error));
+
+      return res.status(200).json(conversations || []);
+
+    } catch (err: any) {
+      console.error('Conversations GET endpoint error:', err.message);
+      return res.status(200).json([]);
     }
-    const { data, error } = await query;
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data);
   });
 
-  app.post("/api/conversations", authMiddleware, async (req: any, res) => {
-    const { title } = req.body;
-    const { data, error } = await supabase.from('conversations').insert({ 
-      title: title || 'New Conversation',
-      employee_id: req.employee.employee_id 
-    }).select().single();
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data);
+  app.post("/api/conversations", async (req, res) => {
+    try {
+      console.log('=== CONVERSATIONS POST ENDPOINT ===');
+      const token = req.headers.authorization?.replace('Bearer ', '');
+
+      if (!token) {
+        return res.status(200).json({ error: 'Auth required' }); // Or empty object if preferred, but following the "don't break load" spirit
+      }
+
+      const { data: session, error: sessionError } = await supabase
+        .from('sessions')
+        .select('*, employees(*)')
+        .eq('token', token)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+
+      if (sessionError || !session || !session.employees) {
+        return res.status(200).json({ error: 'Session expired' });
+      }
+
+      const { title } = req.body;
+      const { data, error } = await supabase.from('conversations').insert({ 
+        title: title || 'New Conversation',
+        employee_id: session.employees.employee_id 
+      }).select().single();
+
+      if (error) {
+        console.error('Conversation creation error:', JSON.stringify(error));
+        return res.status(200).json({ error: 'Creation failed' });
+      }
+
+      return res.json(data);
+    } catch (err: any) {
+      console.error('Conversations POST endpoint error:', err.message);
+      return res.status(200).json({ error: err.message });
+    }
   });
 
   app.get("/api/conversations/:id/messages", authMiddleware, async (req: any, res) => {
