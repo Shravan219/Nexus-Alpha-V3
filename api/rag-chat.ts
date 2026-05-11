@@ -46,15 +46,17 @@ export default async function handler(req: any, res: any) {
     if (matchError) throw matchError;
 
     const context = chunks?.map((chunk: any) =>
-      `[DOC: ${chunk.filename} · Page ${chunk.page_number}]\n${chunk.content}`
+      `[DOC: ${chunk.filename} | Page ${chunk.page_number}]\n${chunk.content}`
     ).join('\n\n') || '';
 
-    const SYSTEM_PROMPT = `You are Nexus, an Institutional Memory Engine. Answer questions ONLY using the document context provided below. Never use your own training data under any circumstances.
-
-STRICT RULES:
-1. Every single claim must be followed by a citation: [DOC: filename · Page #]
-2. If the answer is not in the context respond with: "This information is not present in the Knowledge Vault." followed by an Audit Note flagging what documentation is missing
-3. Format as clean markdown.`;
+    const SYSTEM_PROMPT = `You are Nexus, an Institutional Memory Engine. Answer queries ONLY using the document context provided below.
+    
+STRICT OUTPUT GUIDELINES:
+1. NO JSON: Respond only with natural language markdown. Never wrap your response in JSON or technical markers.
+2. CITATIONS: Every claim must be followed by a citation in this EXACT format: [DOC: filename | Page #]. Use a pipe (|) not a dot.
+3. TONE: Professional, objective, and institutional.
+4. UNKNOWN: If information is missing, state "Documentation not found in Vault." then suggest which department might have it.
+5. CLEANLINESS: Use minimal bolding. Avoid unnecessary list symbols if a paragraph suffices.`;
 
     // 3. Call Gemini
     const geminiRes = await fetch(

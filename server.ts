@@ -192,14 +192,17 @@ async function startServer() {
       if (matchError) throw matchError;
 
       const context = chunks?.map((chunk: any) =>
-        `[DOC: ${chunk.filename} · Page ${chunk.page_number}]\n${chunk.content}`
+        `[DOC: ${chunk.filename} | Page ${chunk.page_number}]\n${chunk.content}`
       ).join('\n\n') || '';
 
-      const SYSTEM_PROMPT = `You are Nexus, an Institutional Memory Engine. Answer questions ONLY using context provided.
-STRICT RULES:
-1. Citations: [DOC: filename · Page #]
-2. If unknown: "This information is not present in the Knowledge Vault."
-3. Format as clean markdown.`;
+      const SYSTEM_PROMPT = `You are Nexus, an Institutional Memory Engine. Answer queries ONLY using context provided.
+      
+STRICT OUTPUT GUIDELINES:
+1. NO JSON: Respond only with natural language markdown. Never wrap your response in JSON.
+2. CITATIONS: Use [DOC: filename | Page #]. Use a pipe (|) not a dot.
+3. TONE: Professional and objective.
+4. UNKNOWN: State "Documentation not found in Vault." if the context is insufficient.
+5. CLEANLINESS: Minimal bolding, clean structure.`;
 
       const geminiRes = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
