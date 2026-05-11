@@ -9,6 +9,7 @@ import Login from '@/components/Login';
 import AdminPanel from '@/components/AdminPanel';
 import { Toaster, toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { SESSION_TOKEN_KEY, SESSION_EMPLOYEE_KEY } from '@/lib/constants';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'vault' | 'query' | 'admin'>('dashboard');
@@ -38,7 +39,7 @@ export default function App() {
   };
 
   const verifySession = async () => {
-    const token = sessionStorage.getItem('nexus_token');
+    const token = sessionStorage.getItem(SESSION_TOKEN_KEY);
     if (!token) {
       setIsVerifying(false);
       return;
@@ -50,18 +51,22 @@ export default function App() {
       if (data.success) {
         setIsLoggedIn(true);
         setCurrentUser(data.employee);
+        sessionStorage.setItem(SESSION_EMPLOYEE_KEY, JSON.stringify(data.employee));
       } else {
-        sessionStorage.removeItem('nexus_token');
+        sessionStorage.removeItem(SESSION_TOKEN_KEY);
+        sessionStorage.removeItem(SESSION_EMPLOYEE_KEY);
       }
     } catch (err) {
-      sessionStorage.removeItem('nexus_token');
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      sessionStorage.removeItem(SESSION_EMPLOYEE_KEY);
     } finally {
       setIsVerifying(false);
     }
   };
 
   const handleLogin = (token: string, employee: any) => {
-    sessionStorage.setItem('nexus_token', token);
+    sessionStorage.setItem(SESSION_TOKEN_KEY, token);
+    sessionStorage.setItem(SESSION_EMPLOYEE_KEY, JSON.stringify(employee));
     setIsLoggedIn(true);
     setCurrentUser(employee);
     toast.success(`Welcome back, Agent ${employee.name}`);
@@ -69,7 +74,8 @@ export default function App() {
 
   const handleLogout = async () => {
     await authFetch('/api/auth/logout', { method: 'POST' });
-    sessionStorage.removeItem('nexus_token');
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    sessionStorage.removeItem(SESSION_EMPLOYEE_KEY);
     setIsLoggedIn(false);
     setCurrentUser(null);
     setActiveTab('dashboard');

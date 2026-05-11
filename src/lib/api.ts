@@ -1,5 +1,7 @@
+import { SESSION_TOKEN_KEY } from './constants';
+
 export const authFetch = async (url: string, options: RequestInit = {}) => {
-  const token = sessionStorage.getItem('nexus_token');
+  const token = sessionStorage.getItem(SESSION_TOKEN_KEY);
   
   return fetch(url, {
     ...options,

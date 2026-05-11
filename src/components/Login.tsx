@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authFetch } from '@/lib/api';
 
 interface LoginProps {
   onLogin: (token: string, employee: any) => void;
@@ -17,9 +18,8 @@ export default function Login({ onLogin }: LoginProps) {
     setError(null);
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await authFetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ employeeId })
       });
 
