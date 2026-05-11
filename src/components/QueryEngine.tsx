@@ -141,7 +141,15 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
     });
 
     return (
-      <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-strong:text-white prose-strong:font-semibold prose-headings:text-zinc-200 prose-headings:font-medium prose-p:mb-4 last:prose-p:mb-0 prose-ul:list-disc prose-ul:pl-4 prose-li:mb-1">
+      <div className="prose prose-invert prose-sm max-w-none 
+        prose-p:leading-relaxed prose-p:mb-5 
+        prose-headings:mt-8 prose-headings:mb-4 prose-headings:text-zinc-100 prose-headings:font-semibold
+        prose-strong:text-white prose-strong:font-bold
+        prose-ul:my-6 prose-ul:list-disc prose-ul:pl-6
+        prose-li:mb-2 prose-li:marker:text-zinc-600
+        prose-code:text-blue-400 prose-code:bg-zinc-900/50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
+        last:prose-p:mb-0"
+      >
         <ReactMarkdown 
           remarkPlugins={[remarkGfm]}
           components={{
@@ -149,7 +157,7 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
               if (href?.startsWith('cite:')) {
                 return (
                   <span
-                    className="inline-flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] px-2 py-0.5 rounded-full font-mono mx-1 whitespace-nowrap align-middle hover:border-blue-900/50 hover:text-blue-400 transition-colors cursor-help group/cite"
+                    className="inline-flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] px-2 py-0.5 rounded-full font-mono mx-1 whitespace-nowrap align-middle hover:border-blue-900/50 hover:text-blue-400 transition-colors cursor-help group/cite select-none"
                     title={decodeURIComponent(href.slice(5))}
                   >
                     <Database size={10} className="text-zinc-600 group-hover/cite:text-blue-500" />
@@ -158,7 +166,7 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
                 );
               }
               return (
-                <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline decoration-blue-900/50 underline-offset-4 transition-colors">
                   {children}
                 </a>
               );
