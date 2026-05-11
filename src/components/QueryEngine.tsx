@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Message } from '@/lib/supabase';
-import { Send, Cpu, User, Loader2, Info, RefreshCw, Command, Zap } from 'lucide-react';
+import { Send, Cpu, User, Loader2, Info, RefreshCw, Command, Zap, FileText } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,8 +11,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
 const CitationPill = ({ text }: { text: string }) => (
-  <span className="inline-flex items-center bg-zinc-900 border border-zinc-700 text-zinc-400 text-xs px-2 py-0.5 rounded font-mono mx-1 whitespace-nowrap align-middle">
-    {text}
+  <span className="relative inline-flex group align-middle mx-0.5">
+    <span className="inline-flex items-center justify-center w-4 h-4 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 hover:text-blue-400 hover:border-blue-500 cursor-pointer transition-colors">
+      <FileText size={9} />
+    </span>
+    {/* Tooltip */}
+    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs font-mono rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+      {text}
+    </span>
   </span>
 );
 
