@@ -10,17 +10,26 @@ import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
-const CitationPill = ({ text }: { text: string }) => (
-  <span className="relative inline-flex group align-middle mx-0.5">
-    <span className="inline-flex items-center justify-center w-4 h-4 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 hover:text-blue-400 hover:border-blue-500 cursor-pointer transition-colors">
-      <FileText size={9} />
+const CitationPill = ({ text }: { text: string }) => {
+  const [show, setShow] = useState(false);
+
+  return (
+    <span
+      className="relative inline-flex align-middle mx-0.5"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      <span className={`inline-flex items-center justify-center w-4 h-4 bg-zinc-800 border rounded cursor-pointer transition-colors ${show ? 'border-blue-500 text-blue-400' : 'border-zinc-700 text-zinc-400'}`}>
+        <FileText size={9} />
+      </span>
+      {show && (
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs font-mono rounded whitespace-nowrap z-50 shadow-lg">
+          {text}
+        </span>
+      )}
     </span>
-    {/* Tooltip */}
-    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs font-mono rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-      {text}
-    </span>
-  </span>
-);
+  );
+};
 
 const processChildren = (children: any, citations: string[]): any => {
   if (typeof children === 'string') {
