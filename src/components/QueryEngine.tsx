@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { authFetch } from '@/lib/api';
 
 const CitationPill = ({ text }: { text: string }) => {
   const [show, setShow] = useState(false);
@@ -81,9 +82,7 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
 
   const fetchMessages = async (id: string) => {
     try {
-      const res = await fetch(`/api/conversations/${id}/messages`, {
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('nexus_token')}` }
-      });
+      const res = await authFetch(`/api/conversations/${id}/messages`);
       const data = await res.json();
       if (Array.isArray(data)) setMessages(data);
     } catch (err) {
@@ -93,12 +92,8 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
 
   const createConversation = async () => {
     try {
-      const res = await fetch('/api/conversations', {
+      const res = await authFetch('/api/conversations', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionStorage.getItem('nexus_token')}` 
-        },
         body: JSON.stringify({ title: query.slice(0, 30) || 'New Inquiry' })
       });
       const data = await res.json();
@@ -116,9 +111,6 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!query.trim() || isLoading) return;
-
-    const token = sessionStorage.getItem('nexus_token');
-    if (!token) return toast.error('Security token missing. Please re-authenticate.');
 
     let currentConversationId = conversationId;
     if (!currentConversationId) {
@@ -149,12 +141,8 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
     setTimeout(() => setLoadStep(3), 1600);
 
     try {
-      const response = await fetch('/api/rag-chat', {
+      const response = await authFetch('/api/rag-chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({
           query: userQuery,
           conversationId: currentConversationId,

@@ -2,14 +2,14 @@ import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { supabase } from '@/lib/supabase';
 import type { Document } from '@/lib/supabase';
-import { FileText, Upload, Trash2, ExternalLink, Loader2, RefreshCw, X, PlusCircle } from 'lucide-react';
+import { FileText, Upload, Trash2, Loader2, RefreshCw, PlusCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { authFetch } from '@/lib/api';
 
 interface VaultProps {
   documents: Document[];
@@ -25,12 +25,8 @@ export default function Vault({ documents, onRefresh, isAdmin = false }: VaultPr
 
   const processDocument = async (docId: string, fileUrl: string, filename: string) => {
     try {
-      const response = await fetch('/api/process-document', {
+      const response = await authFetch('/api/process-document', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionStorage.getItem('nexus_token')}`
-        },
         body: JSON.stringify({
           documentId: docId,
           fileUrl,
@@ -39,24 +35,34 @@ export default function Vault({ documents, onRefresh, isAdmin = false }: VaultPr
       });
 
       if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const result = await response.json();
-          throw new Error(result.error || `Server error: ${response.status}`);
-        } else {
-          const text = await response.text();
-          console.error("Server returned non-JSON:", text);
-          throw new Error(`Server returned HTML/Text (Error ${response.status}). Check console.`);
-        }
+        const result = await response.json();
+        throw new Error(result.error || `Server error: ${response.status}`);
       }
 
-      const result = await response.json();
       toast.success(`${filename} processed successfully`);
       onRefresh();
     } catch (error: any) {
       console.error(error);
       toast.error(`Processing failed: ${error.message}`);
       onRefresh();
+    }
+  };
+
+  const deleteDocument = async (doc: Document) => {
+    if (!confirm(`Purge ${doc.name} and all associated neural weights?`)) return;
+    try {
+      const res = await authFetch(`/api/documents/${doc.id}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Purge failed');
+      }
+      
+      toast.success(`${doc.name} purged from vault`);
+      onRefresh();
+    } catch (error: any) {
+      toast.error(`Deletion failed: ${error.message}`);
     }
   };
 
@@ -75,7 +81,7 @@ export default function Vault({ documents, onRefresh, isAdmin = false }: VaultPr
         const fileExt = file.name.split('.').pop();
         const filePath = `${Math.random()}.${fileExt}`;
         
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { data, error: uploadError } = await supabase.storage
           .from('knowledge-vault')
           .upload(filePath, file);
 
@@ -105,19 +111,6 @@ export default function Vault({ documents, onRefresh, isAdmin = false }: VaultPr
   }, [onRefresh]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
-
-  const deleteDocument = async (doc: Document) => {
-    try {
-      // Small delay to prevent race conditions
-      const { error: dbError } = await supabase.from('documents').delete().eq('id', doc.id);
-      if (dbError) throw dbError;
-      
-      toast.success(`${doc.name} purged from vault`);
-      onRefresh();
-    } catch (error: any) {
-      toast.error(`Deletion failed: ${error.message}`);
-    }
-  };
 
   const handleManualIngest = async () => {
     if (!pasteTitle || !pasteText) return;

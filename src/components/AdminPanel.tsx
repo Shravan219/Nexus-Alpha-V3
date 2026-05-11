@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Users, FileText, Trash2, ShieldCheck, ShieldAlert, Plus, X } from 'lucide-react';
+import { Users, Trash2, ShieldCheck, ShieldAlert, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { authFetch } from '@/lib/api';
 
 interface Employee {
   employee_id: string;
@@ -19,9 +20,7 @@ export default function AdminPanel() {
 
   const fetchEmployees = async () => {
     try {
-      const res = await fetch('/api/employees', {
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('nexus_token')}` }
-      });
+      const res = await authFetch('/api/employees');
       const data = await res.json();
       if (Array.isArray(data)) setEmployees(data);
     } catch (err) {
@@ -37,12 +36,8 @@ export default function AdminPanel() {
 
   const handleToggleActive = async (empId: string, currentStatus: boolean) => {
     try {
-      await fetch(`/api/employees/${empId}`, {
+      await authFetch(`/api/employees/${empId}`, {
         method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionStorage.getItem('nexus_token')}` 
-        },
         body: JSON.stringify({ isActive: !currentStatus })
       });
       fetchEmployees();
@@ -55,9 +50,8 @@ export default function AdminPanel() {
   const handleDelete = async (empId: string) => {
     if (!confirm('Permanently delete this employee account? This will orphan their conversations.')) return;
     try {
-      await fetch(`/api/employees/${empId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('nexus_token')}` }
+      await authFetch(`/api/employees/${empId}`, {
+        method: 'DELETE'
       });
       fetchEmployees();
       toast.success('Employee record purged');
@@ -69,12 +63,8 @@ export default function AdminPanel() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/employees', {
+      const res = await authFetch('/api/employees', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionStorage.getItem('nexus_token')}` 
-        },
         body: JSON.stringify(newEmp)
       });
       if (res.ok) {

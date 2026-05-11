@@ -89,6 +89,37 @@ async function startServer() {
 
   const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
+  // --- AUTH MIDDLEWARE ---
+  const authMiddleware = async (req: any, res: any, next: any) => {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) return res.status(401).json({ error: "Session expired or invalid" });
+
+    try {
+      const { data: session, error } = await supabase
+        .from('sessions')
+        .select('*, employees(*)')
+        .eq('token', token)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+
+      if (error || !session || !session.employees) {
+        return res.status(401).json({ error: "Session expired or invalid" });
+      }
+
+      req.employee = session.employees;
+      next();
+    } catch (err) {
+      return res.status(401).json({ error: "Session expired or invalid" });
+    }
+  };
+
+  const adminMiddleware = (req: any, res: any, next: any) => {
+    if (req.employee.role !== 'admin') {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    next();
+  };
+
   // --- AUTH ENDPOINTS ---
 
   app.post("/api/auth/login", async (req, res) => {
@@ -131,35 +162,16 @@ async function startServer() {
     }
   });
 
-  app.get("/api/auth/verify", async (req, res) => {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) return res.status(401).json({ error: "Missing token" });
-
-    try {
-      // Check session
-      const { data: session, error: sessError } = await supabase
-        .from('sessions')
-        .select('*, employees(*)')
-        .eq('token', token)
-        .gt('expires_at', new Date().toISOString())
-        .single();
-
-      if (sessError || !session || !session.employees) {
-        return res.status(401).json({ error: "Invalid or expired session" });
+  app.get("/api/auth/verify", authMiddleware, async (req: any, res) => {
+    const employee = req.employee;
+    res.json({
+      success: true,
+      employee: {
+        id: employee.employee_id,
+        name: employee.full_name,
+        role: employee.role
       }
-
-      const employee = session.employees;
-      res.json({
-        success: true,
-        employee: {
-          id: employee.employee_id,
-          name: employee.full_name,
-          role: employee.role
-        }
-      });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
+    });
   });
 
   app.post("/api/auth/logout", async (req, res) => {
@@ -169,33 +181,6 @@ async function startServer() {
     }
     res.json({ success: true });
   });
-
-  // --- AUTH MIDDLEWARE ---
-  const authMiddleware = async (req: any, res: any, next: any) => {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) return res.status(401).json({ error: "Unauthorized" });
-
-    const { data: session, error } = await supabase
-      .from('sessions')
-      .select('*, employees(*)')
-      .eq('token', token)
-      .gt('expires_at', new Date().toISOString())
-      .single();
-
-    if (error || !session || !session.employees) {
-      return res.status(401).json({ error: "Session expired or invalid" });
-    }
-
-    req.employee = session.employees;
-    next();
-  };
-
-  const adminMiddleware = (req: any, res: any, next: any) => {
-    if (req.employee.role !== 'admin') {
-      return res.status(403).json({ error: "Admin access required" });
-    }
-    next();
-  };
 
   // --- EMPLOYEE MANAGEMENT ---
   app.get("/api/employees", authMiddleware, adminMiddleware, async (req, res) => {
@@ -347,6 +332,20 @@ async function startServer() {
     } catch (error: any) {
       console.error("PROCESSING FAILED AT STEP:", error);
       await supabase.from('documents').update({ status: 'error', error_message: error.message }).eq('id', documentId);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/documents/:id", authMiddleware, adminMiddleware, async (req, res) => {
+    const { id } = req.params;
+    try {
+      // 1. Delete chunks first (foreign key constraint)
+      await supabase.from('document_chunks').delete().eq('document_id', id);
+      // 2. Delete document
+      const { error } = await supabase.from('documents').delete().eq('id', id);
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });

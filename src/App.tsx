@@ -8,6 +8,7 @@ import QueryEngine from '@/components/QueryEngine';
 import Login from '@/components/Login';
 import AdminPanel from '@/components/AdminPanel';
 import { Toaster, toast } from 'sonner';
+import { authFetch } from '@/lib/api';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'vault' | 'query' | 'admin'>('dashboard');
@@ -27,13 +28,8 @@ export default function App() {
   };
 
   const fetchConversations = async () => {
-    const token = sessionStorage.getItem('nexus_token');
-    if (!token) return;
-
     try {
-      const res = await fetch('/api/conversations', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await authFetch('/api/conversations');
       const data = await res.json();
       if (Array.isArray(data)) setConversations(data);
     } catch (err) {
@@ -49,9 +45,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('/api/auth/verify', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await authFetch('/api/auth/verify');
       const data = await res.json();
       if (data.success) {
         setIsLoggedIn(true);
@@ -74,11 +68,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    const token = sessionStorage.getItem('nexus_token');
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
+    await authFetch('/api/auth/logout', { method: 'POST' });
     sessionStorage.removeItem('nexus_token');
     setIsLoggedIn(false);
     setCurrentUser(null);
