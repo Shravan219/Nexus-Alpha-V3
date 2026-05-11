@@ -189,13 +189,6 @@ async function startServer() {
     res.json(data);
   });
 
-  app.post("/api/employees", authMiddleware, adminMiddleware, async (req, res) => {
-    const { employeeId, fullName, role } = req.body;
-    const { data, error } = await supabase.from('employees').insert({ employee_id: employeeId, full_name: fullName, role }).select().single();
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data);
-  });
-
   app.patch("/api/employees/:id", authMiddleware, adminMiddleware, async (req, res) => {
     const { isActive } = req.body;
     const { data, error } = await supabase.from('employees').update({ is_active: isActive }).eq('employee_id', req.params.id).select().single();

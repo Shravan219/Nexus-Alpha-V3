@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Trash2, ShieldCheck, ShieldAlert, Plus, X } from 'lucide-react';
+import { Users, Trash2, ShieldCheck, ShieldAlert, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { authFetch } from '@/lib/api';
@@ -15,8 +15,6 @@ interface Employee {
 export default function AdminPanel() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newEmp, setNewEmp] = useState({ employeeId: '', fullName: '', role: 'employee' as 'admin' | 'employee' });
 
   const fetchEmployees = async () => {
     try {
@@ -60,27 +58,6 @@ export default function AdminPanel() {
     }
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await authFetch('/api/employees', {
-        method: 'POST',
-        body: JSON.stringify(newEmp)
-      });
-      if (res.ok) {
-        fetchEmployees();
-        setShowAddForm(false);
-        setNewEmp({ employeeId: '', fullName: '', role: 'employee' });
-        toast.success('Employee credential established');
-      } else {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to create');
-      }
-    } catch (err) {
-      toast.error('Network error');
-    }
-  };
-
   return (
     <div className="p-8 h-full overflow-y-auto bg-black animate-in fade-in duration-500">
       <div className="max-w-6xl mx-auto space-y-12">
@@ -93,12 +70,6 @@ export default function AdminPanel() {
               Only Administrators have authority to modify core neural nodes.
             </p>
           </div>
-          <button 
-            onClick={() => setShowAddForm(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-6 py-3 rounded flex items-center gap-2 transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)]"
-          >
-            <Plus size={14} /> INITIALIZE AGENT
-          </button>
         </div>
 
         {/* Stats */}
@@ -194,58 +165,6 @@ export default function AdminPanel() {
           {!loading && employees.length === 0 && <div className="p-12 text-center text-zinc-700 font-mono text-xs">NO PERSONNEL RECORDS FOUND</div>}
         </div>
       </div>
-
-      {/* Add Form Modal */}
-      {showAddForm && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-zinc-950 border border-zinc-900 w-full max-w-sm rounded-xl overflow-hidden shadow-2xl"
-          >
-            <div className="p-4 border-b border-zinc-900 flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Initialize New Agent</p>
-              <button onClick={() => setShowAddForm(false)} className="text-zinc-600 hover:text-white"><X size={18} /></button>
-            </div>
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-zinc-600 uppercase font-bold">Unique Employee ID</label>
-                <input 
-                  required
-                  placeholder="e.g. EMP042"
-                  value={newEmp.employeeId}
-                  onChange={e => setNewEmp({...newEmp, employeeId: e.target.value.toUpperCase()})}
-                  className="w-full bg-black border border-zinc-800 rounded px-3 py-2 text-sm text-white focus:border-blue-600 focus:outline-none placeholder:text-zinc-800 font-mono"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-zinc-600 uppercase font-bold">Full Identity Name</label>
-                <input 
-                  required
-                  placeholder="e.g. John Doe"
-                  value={newEmp.fullName}
-                  onChange={e => setNewEmp({...newEmp, fullName: e.target.value})}
-                  className="w-full bg-black border border-zinc-800 rounded px-3 py-2 text-sm text-white focus:border-blue-600 focus:outline-none"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-zinc-600 uppercase font-bold">Access Privilege Tier</label>
-                <select 
-                  value={newEmp.role}
-                  onChange={e => setNewEmp({...newEmp, role: e.target.value as any})}
-                  className="w-full bg-black border border-zinc-800 rounded px-3 py-2 text-sm text-white focus:border-blue-600 focus:outline-none"
-                >
-                  <option value="employee">Standard Employee</option>
-                  <option value="admin">System Administrator</option>
-                </select>
-              </div>
-              <button className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-3 mt-4 rounded transition-all">
-                CONFIRM AUTHORIZATION
-              </button>
-            </form>
-          </motion.div>
-        </div>
-      )}
     </div>
   );
 }
