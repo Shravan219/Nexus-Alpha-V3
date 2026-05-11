@@ -51,6 +51,18 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function startServer() {
+  const requiredEnvVars = [
+    'VITE_SUPABASE_URL',
+    'VITE_SUPABASE_ANON_KEY',
+    'GEMINI_API_KEY'
+  ];
+
+  const missingVars = requiredEnvVars.filter(v => !process.env[v]);
+  if (missingVars.length > 0) {
+    console.error(`[Critical] Missing required environment variables: ${missingVars.join(', ')}`);
+    console.error("Please configure these in the Settings -> Secrets menu.");
+  }
+
   const app = express();
   const PORT = 3000;
 
