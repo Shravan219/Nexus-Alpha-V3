@@ -104,16 +104,9 @@ export default function Sidebar({ activeTab, setActiveTab, documents, selectedDo
       </div>
 
       <div className="p-4 border-t border-[#1a1a1a]">
-        <div className="bg-zinc-900/30 rounded-lg p-3 border border-zinc-900">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold">
-              SYS
-            </div>
-            <div>
-              <p className="text-[11px] font-bold">Root System</p>
-              <p className="text-[9px] text-zinc-500 uppercase tracking-tighter">Institutional Overseer</p>
-            </div>
-          </div>
+        <div className="flex items-center justify-between px-2">
+          <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">v2.5.0-STABLE</p>
+          <div className="h-1 w-1 rounded-full bg-green-500/50" />
         </div>
       </div>
     </aside>
