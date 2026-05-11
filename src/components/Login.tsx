@@ -24,6 +24,9 @@ export default function Login({ onLogin }: LoginProps) {
       });
 
       const data = await res.json();
+      console.log('Login response:', JSON.stringify(data));
+      console.log('Token value:', data.token);
+      console.log('Full data keys:', Object.keys(data));
 
       if (data.success) {
         onLogin(data.token, data.employee);

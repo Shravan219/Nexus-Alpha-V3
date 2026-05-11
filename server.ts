@@ -92,7 +92,11 @@ async function startServer() {
   // --- AUTH MIDDLEWARE ---
   const authMiddleware = async (req: any, res: any, next: any) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) return res.status(401).json({ error: "Session expired or invalid" });
+    console.log(`[Auth] Path: ${req.url}, Token received: ${token ? (token.slice(0, 8) + '...') : 'NONE'}`);
+    
+    if (!token || token === 'undefined') {
+      return res.status(401).json({ error: "Session expired or invalid" });
+    }
 
     try {
       const { data: session, error } = await supabase
@@ -143,12 +147,17 @@ async function startServer() {
       const { data: session, error: sessError } = await supabase
         .from('sessions')
         .insert({ employee_id: employeeId })
-        .select()
+        .select('*')
         .single();
 
-      if (sessError) throw sessError;
+      if (sessError) {
+        console.error('Session creation error:', sessError);
+        throw sessError;
+      }
 
-      res.json({
+      console.log('Session created successfully:', JSON.stringify(session));
+
+      return res.status(200).json({
         success: true,
         token: session.token,
         employee: {
@@ -158,6 +167,7 @@ async function startServer() {
         }
       });
     } catch (error: any) {
+      console.error('Login processing error:', error.message);
       res.status(500).json({ error: error.message });
     }
   });
