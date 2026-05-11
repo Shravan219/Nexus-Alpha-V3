@@ -27,24 +27,6 @@ const extractTextFromPDF = (buffer: Buffer): Promise<{page_number: number, text:
   });
 };
 
-const getEmbedding = async (text: string, apiKey: string): Promise<number[]> => {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content: { parts: [{ text }] }
-      })
-    }
-  );
-  const data = await res.json();
-  if (!data?.embedding?.values) {
-    throw new Error(`Embedding failed: ${JSON.stringify(data)}`);
-  }
-  return data.embedding.values;
-};
-
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -371,8 +353,53 @@ async function startServer() {
     }
   });
 
-  // 1. Process Document Logic
-  app.post("/api/process-document", authMiddleware, adminMiddleware, async (req, res) => {
+  // --- AI HELPERS ---
+  app.post("/api/match-chunks", authMiddleware, async (req: any, res) => {
+    try {
+      const { embedding, documentId } = req.body;
+      if (!embedding) return res.status(400).json({ error: "Missing embedding" });
+
+      const { data: chunks, error: matchError } = await supabase.rpc('match_documents', {
+        query_embedding: embedding,
+        match_threshold: 0.5,
+        match_count: 8,
+        filter_document_id: documentId || null
+      });
+
+      if (matchError) throw matchError;
+
+      const context = chunks?.map((chunk: any) =>
+        `[DOC: ${chunk.filename} | Page ${chunk.page_number}]\n${chunk.content}`
+      ).join('\n\n') || '';
+
+      res.json({ context, chunks });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/conversations/:id/messages", authMiddleware, async (req: any, res) => {
+    try {
+      const { role, content } = req.body;
+      const conversationId = req.params.id;
+      const employeeId = req.employee.employee_id;
+
+      const { data, error } = await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        role,
+        content,
+        employee_id: employeeId
+      }).select().single();
+
+      if (error) throw error;
+      res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 1. Prepare Document (Extract and Chunk)
+  app.post("/api/prepare-document", authMiddleware, adminMiddleware, async (req, res) => {
     const { documentId, fileUrl, filename } = req.body;
     
     if (!documentId || !fileUrl) {
@@ -380,70 +407,78 @@ async function startServer() {
     }
 
     try {
-      console.log(`[Server] Starting process for ${filename} (ID: ${documentId})`);
-      
+      console.log(`[Server] Preparing ${filename} (ID: ${documentId})`);
       await supabase.from('documents').update({ status: 'processing', error_message: null }).eq('id', documentId);
 
-      // 1. Download PDF
-      console.log('Step 1: Downloading PDF from:', fileUrl);
-      const pdfResponse = await fetch(fileUrl);
-      if (!pdfResponse.ok) throw new Error(`Download failed: ${pdfResponse.statusText}`);
-      const buffer = Buffer.from(await pdfResponse.arrayBuffer());
-      console.log('Step 1 complete. Buffer size:', buffer.byteLength);
-
-      // 2. Extract text
-      console.log('Step 2: Extracting text using PDFParser...');
-      const pages = await extractTextFromPDF(buffer);
-      console.log('Step 2 complete. Pages found:', pages.length);
+      // 1. Download Content
+      const downloadResponse = await fetch(fileUrl);
+      if (!downloadResponse.ok) throw new Error(`Download failed: ${downloadResponse.statusText}`);
       
-      let chunkIndex = 0;
-      let totalChunks = 0;
+      let chunks: { text: string, page: number }[] = [];
 
-      // 3. Chunk and Embed
-      console.log('Step 3: Beginning chunking and embedding loop...');
-      for (const page of pages) {
+      if (filename.toLowerCase().endsWith('.pdf')) {
+        const buffer = Buffer.from(await downloadResponse.arrayBuffer());
+        const pages = await extractTextFromPDF(buffer);
+        
+        pages.forEach(page => {
+          const chunkSize = 1000;
+          const overlap = 100;
+          const text = page.text;
+          for (let i = 0; i < text.length; i += chunkSize - overlap) {
+            const chunkText = text.slice(i, i + chunkSize);
+            if (chunkText.trim().length > 20) {
+              chunks.push({ text: chunkText, page: page.page_number });
+            }
+          }
+        });
+      } else {
+        const text = await downloadResponse.text();
         const chunkSize = 1000;
         const overlap = 100;
-        const text = page.text;
-        
-        console.log(`Processing page ${page.page_number} (length: ${text.length})`);
-
         for (let i = 0; i < text.length; i += chunkSize - overlap) {
           const chunkText = text.slice(i, i + chunkSize);
-          if (chunkText.trim().length < 20) continue;
-
-          console.log(`Generating embedding for chunk ${chunkIndex} (length: ${chunkText.length})`);
-          const embedding = await getEmbedding(chunkText, GEMINI_API_KEY!);
-
-          console.log(`Inserting chunk ${chunkIndex} into document_chunks...`);
-          const { error: insertError } = await supabase.from('document_chunks').insert({
-            document_id: documentId,
-            filename,
-            page_number: page.page_number,
-            chunk_index: chunkIndex++,
-            content: chunkText,
-            embedding
-          });
-
-          if (insertError) {
-            console.error(`Chunk insert failed at index ${chunkIndex-1}:`, JSON.stringify(insertError));
-            throw new Error(`Failed to insert chunk: ${insertError.message}`);
+          if (chunkText.trim().length > 20) {
+            chunks.push({ text: chunkText, page: 1 });
           }
-
-          totalChunks++;
         }
       }
-      console.log('Step 3 complete. Total chunks processed and inserted:', totalChunks);
 
-      // 4. Mark as ready
-      console.log('Step 4: Finalizing document state to "ready"');
-      await supabase.from('documents').update({ status: 'ready', chunk_count: totalChunks }).eq('id', documentId);
-      
-      console.log(`[Server] Successfully processed ${filename}`);
-      res.json({ success: true, chunks: totalChunks });
-
+      res.json({ chunks });
     } catch (error: any) {
-      console.error("PROCESSING FAILED AT STEP:", error);
+      console.error("PREPARATION FAILED:", error);
+      await supabase.from('documents').update({ status: 'error', error_message: error.message }).eq('id', documentId);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 2. Insert Chunks
+  app.post("/api/insert-document-chunks", authMiddleware, adminMiddleware, async (req, res) => {
+    const { documentId, filename, chunks } = req.body;
+    
+    try {
+      console.log(`[Server] Inserting ${chunks.length} chunks for ${filename}`);
+      
+      const { error: insertError } = await supabase.from('document_chunks').insert(
+        chunks.map((c: any, idx: number) => ({
+          document_id: documentId,
+          filename,
+          page_number: c.page,
+          chunk_index: idx,
+          content: c.text,
+          embedding: c.embedding
+        }))
+      );
+
+      if (insertError) throw insertError;
+
+      await supabase.from('documents').update({ 
+        status: 'ready', 
+        chunk_count: chunks.length 
+      }).eq('id', documentId);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("INSERT FAILED:", error);
       await supabase.from('documents').update({ status: 'error', error_message: error.message }).eq('id', documentId);
       res.status(500).json({ error: error.message });
     }
@@ -463,120 +498,9 @@ async function startServer() {
     }
   });
 
-  // 2. RAG Chat Logic
+  // 2. RAG Chat Logic (Deprecated - logic moved to frontend)
   app.post("/api/rag-chat", async (req, res) => {
-    try {
-      const { query, conversationId, documentId } = req.body;
-      if (!query) return res.status(400).json({ error: "Missing query" });
-
-      const token = req.headers.authorization?.replace('Bearer ', '');
-      
-      // Get employee if token exists but don't block if it doesn't
-      let employeeId = null;
-
-      if (token) {
-        const { data: session } = await supabase
-          .from('sessions')
-          .select('*, employees(*)')
-          .eq('id', token)
-          .gt('expires_at', new Date().toISOString())
-          .single();
-        
-        if (session) {
-          employeeId = session.employees.employee_id;
-        }
-      }
-
-      const queryEmbedding = await getEmbedding(query, GEMINI_API_KEY!);
-
-      const { data: chunks, error: matchError } = await supabase.rpc('match_documents', {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.5,
-        match_count: 8,
-        filter_document_id: documentId || null
-      });
-
-      if (matchError) throw matchError;
-
-      const context = chunks?.map((chunk: any) =>
-        `[DOC: ${chunk.filename} | Page ${chunk.page_number}]\n${chunk.content}`
-      ).join('\n\n') || '';
-
-      const SYSTEM_PROMPT = `You are Nexus, the Institutional Memory Engine. Answer queries with absolute precision using ONLY the provided document context.
-
-TONE & VOICE:
-- Assume the persona of a Senior Technical Architect.
-- Be direct, clinical, and precise. 
-- Eliminate all conversational filler (no "Certainly!", "I can help with that", or "Great question").
-- Use declarative sentences. Never use "I" or address the user directly.
-
-STRUCTURE:
-- Lead with the most critical information.
-- Use bold Markdown headers (### Header) for major sections.
-- Use bullet points for lists and numbered lists for sequential protocols.
-- Paragraphs must be concise (max 3 sentences).
-- Mandatory double spacing between sections.
-
-CITATION PROTOCOL:
-- Every claim must be followed by a citation in this EXACT format: [DOC: filename | Page #].
-- Place the citation immediately after the supporting claim, not at the end of the paragraph or section.
-- Every bullet point must include its own citation on the same line if supported.
-- Never stack citations.
-
-FORMATTING:
-- Use asterisks only for **bold** and *italic* emphasis.
-- Use ALL CAPS only for SECTION LABELS or high-level status indicators.
-- No ellipses, em dashes, or decorative syntax.
-- Zero closing statements or pleasantries.
-
-MISSING INFORMATION (DATA DEFICIENCY PROTOCOL):
-- If the vault contains insufficient data, state exactly: "This information is not present in the Knowledge Vault."
-- Follow immediately with a clinical 'Nexus Audit' note identifying the specific missing documentation.
-- Never apologize for data gaps.
-
-STRICT NEGATIVE CONSTRAINT:
-- DO NOT RETURN JSON. Respond ONLY with raw Markdown text.`;
-
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            contents: [{
-              role: 'user',
-              parts: [{ text: `DOCUMENT CONTEXT:\n${context}\n\nUSER QUERY: ${query}` }]
-            }],
-            generationConfig: {
-              temperature: 0.1,
-              topP: 0.95,
-              responseMimeType: "text/plain"
-            }
-          })
-        }
-      );
-
-      if (!geminiRes.ok) {
-        const errText = await geminiRes.text();
-        throw new Error(`Gemini Generation Error (${geminiRes.status}): ${errText}`);
-      }
-
-      const geminiData = await geminiRes.json();
-      const answer = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
-
-      if (conversationId && employeeId) {
-        await supabase.from('messages').insert([
-          { conversation_id: conversationId, role: 'user', content: query, employee_id: employeeId },
-          { conversation_id: conversationId, role: 'assistant', content: answer, employee_id: employeeId }
-        ]);
-      }
-
-      res.json({ answer, chunks });
-    } catch (error: any) {
-      console.error("[Server Error]", error);
-      res.status(500).json({ error: error.message });
-    }
+    res.status(410).json({ error: "Deprecated. RAG logic has been moved to frontend to avoid regional restriction errors." });
   });
 
   app.all("/api/*", (req, res) => {

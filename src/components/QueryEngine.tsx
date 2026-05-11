@@ -10,6 +10,7 @@ import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { getEmbedding, generateRAGResponse } from '@/lib/gemini';
 
 const CitationPill = ({ text }: { text: string }) => {
   const [show, setShow] = useState(false);
@@ -155,31 +156,41 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
       setTimeout(() => setLoadStep(2), 800);
       setTimeout(() => setLoadStep(3), 1600);
 
-      const res = await authFetch('/api/rag-chat', {
+      // 1. Generate Embedding in Frontend
+      console.log('Frontend: Generating embedding...');
+      const embedding = await getEmbedding(userQuery);
+
+      // 2. Fetch context from Backend
+      console.log('Backend: Fetching matching chunks...');
+      const matchRes = await authFetch('/api/match-chunks', {
         method: 'POST',
         body: JSON.stringify({
-          query: userQuery,
-          conversationId: activeConversationId,
-          documentId: selectedDocId || null,
-          employeeId: employee?.id
+          embedding,
+          documentId: selectedDocId || null
         })
       });
+      const { context, chunks } = await matchRes.json();
+      
+      if (!matchRes.ok) throw new Error('Context retrieval failed');
 
-      const data = await res.json();
-      console.log('Neural Response:', data);
+      // 3. Generate Answer in Frontend
+      console.log('Frontend: Generating RAG response...');
+      const answer = await generateRAGResponse(userQuery, context);
 
-      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+      // 4. Save messages to DB
+      console.log('Backend: Saving messages...');
+      await authFetch(`/api/conversations/${activeConversationId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ role: 'user', content: userQuery })
+      });
+      const saveRes = await authFetch(`/api/conversations/${activeConversationId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ role: 'assistant', content: answer })
+      });
+      const savedAssistantMsg = await saveRes.json();
 
-      // Add assistant response to UI
-      const assistantMsg: Message = {
-        id: `assistant-${Date.now()}`,
-        conversation_id: activeConversationId!,
-        role: 'assistant',
-        content: data.answer,
-        employee_id: employee?.id || '',
-        created_at: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, assistantMsg]);
+      // Update UI with real message data
+      setMessages(prev => prev.filter(m => !m.id.startsWith('temp-')).concat(savedAssistantMsg));
       onMessageSent?.();
 
     } catch (err: any) {

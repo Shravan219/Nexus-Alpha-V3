@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { getEmbedding } from '@/lib/gemini';
 
 interface VaultProps {
   documents: Document[];
@@ -25,21 +26,45 @@ export default function Vault({ documents, onRefresh, isAdmin = false }: VaultPr
 
   const processDocument = async (docId: string, fileUrl: string, filename: string) => {
     try {
-      const response = await authFetch('/api/process-document', {
+      // Step 1: Prep document on server (extract text & chunk)
+      const prepRes = await authFetch('/api/prepare-document', {
+        method: 'POST',
+        body: JSON.stringify({ documentId: docId, fileUrl, filename })
+      });
+
+      if (!prepRes.ok) {
+        const prepData = await prepRes.json();
+        throw new Error(prepData.error || `Prep failed: ${prepRes.status}`);
+      }
+
+      const { chunks } = await prepRes.json();
+      toast.info(`Extracted ${chunks.length} segments. Commencing neural mapping...`);
+
+      // Step 2: Embed chunks in frontend
+      const chunksWithEmbeddings = [];
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        console.log(`Embedding chunk ${i + 1}/${chunks.length}`);
+        const embedding = await getEmbedding(chunk.text);
+        chunksWithEmbeddings.push({ ...chunk, embedding });
+      }
+
+      // Step 3: Insert chunks back to server
+      const insertRes = await authFetch('/api/insert-document-chunks', {
         method: 'POST',
         body: JSON.stringify({
           documentId: docId,
-          fileUrl,
-          filename
+          filename,
+          chunks: chunksWithEmbeddings
         })
       });
 
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.error || `Server error: ${response.status}`);
+      if (!insertRes.ok) {
+        const insertData = await insertRes.json();
+        throw new Error(insertData.error || `Insert failed: ${insertRes.status}`);
       }
 
-      toast.success(`${filename} processed successfully`);
+      toast.success(`${filename} processed and mapped successfully`);
       onRefresh();
     } catch (error: any) {
       console.error(error);
