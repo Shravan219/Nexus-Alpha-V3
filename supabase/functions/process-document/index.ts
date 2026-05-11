@@ -31,7 +31,7 @@ serve(async (req) => {
       reader.readAsDataURL(blob);
     });
 
-    // Use Gemini 2.0 Flash to "see" the PDF and extract text
+    // Use Gemini 2.5 Flash to "see" the PDF and extract text
     // This moves the heavy parsing to Google's infra, keeping the Edge Function tiny
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,

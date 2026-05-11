@@ -91,7 +91,7 @@ export default function Dashboard({ documents, conversations, onNavigateToDocs }
               <div className="mt-1 h-2 w-2 rounded-full bg-blue-600 shrink-0" />
               <div>
                 <p className="text-sm font-bold">3. Grounded Synthesis</p>
-                <p className="text-xs text-zinc-500 mt-1">Gemini 2.0 Flash synthesizes answers using ONLY found context, including mandatory filename and page citations.</p>
+                <p className="text-xs text-zinc-500 mt-1">Gemini 2.5 Flash synthesizes answers using ONLY found context, including mandatory filename and page citations.</p>
               </div>
             </div>
           </CardContent>

@@ -283,6 +283,8 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
                     <div>Grounding Strength: High</div>
                     <div className="h-1 w-1 rounded-full bg-zinc-800" />
                     <div>Execution Time: 2.1s</div>
+                    <div className="h-1 w-1 rounded-full bg-zinc-800" />
+                    <div>Model: Gemini 2.5 Flash</div>
                   </div>
                 )}
               </div>
