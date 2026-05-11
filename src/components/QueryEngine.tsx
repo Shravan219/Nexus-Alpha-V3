@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -122,39 +123,50 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
   };
 
   const renderMessageContent = (content: string) => {
-    // If it looks like JSON, it's a failure mode - try to parse or just show as text
+    // If it looks like JSON, it's a failure mode
     if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
       try {
         const parsed = JSON.parse(content);
         if (parsed.answer) return renderMessageContent(parsed.answer);
       } catch (e) {
-        // Not actual JSON, just coincidental braces
+        // Not actual JSON
       }
     }
 
-    const parts = content.split(/(\[DOC:[^\]]+\])/g);
+    // Pre-process citations into unique markdown links
+    // [DOC: file | Page 1] -> [DOC: file | Page 1](cite:file%20|%20Page%201)
+    const processed = content.replace(/\[DOC: ([^\]]+)\]/g, (match, p1) => {
+      const citeText = `DOC: ${p1}`;
+      return `[${citeText}](cite:${encodeURIComponent(p1)})`;
+    });
+
     return (
-      <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-strong:text-white prose-strong:font-semibold prose-headings:text-zinc-200 prose-headings:font-medium prose-p:mb-4 last:prose-p:mb-0">
-        {parts.map((part, index) => {
-          if (part.match(/^\[DOC:.+\]$/)) {
-            const citeText = part.slice(5, -1).replace(' | ', ' ');
-            return (
-              <span
-                key={index}
-                className="inline-flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] px-2 py-0.5 rounded-full font-mono mx-1 whitespace-nowrap align-middle hover:border-blue-900/50 hover:text-blue-400 transition-colors cursor-help group/cite"
-                title={citeText}
-              >
-                <Database size={10} className="text-zinc-600 group-hover/cite:text-blue-500" />
-                {citeText}
-              </span>
-            );
-          }
-          return (
-            <ReactMarkdown key={index} components={{ p: ({children}) => <span className="inline">{children}</span> }}>
-              {part}
-            </ReactMarkdown>
-          );
-        })}
+      <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-strong:text-white prose-strong:font-semibold prose-headings:text-zinc-200 prose-headings:font-medium prose-p:mb-4 last:prose-p:mb-0 prose-ul:list-disc prose-ul:pl-4 prose-li:mb-1">
+        <ReactMarkdown 
+          remarkPlugins={[remarkGfm]}
+          components={{
+            a: ({ href, children }) => {
+              if (href?.startsWith('cite:')) {
+                return (
+                  <span
+                    className="inline-flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] px-2 py-0.5 rounded-full font-mono mx-1 whitespace-nowrap align-middle hover:border-blue-900/50 hover:text-blue-400 transition-colors cursor-help group/cite"
+                    title={decodeURIComponent(href.slice(5))}
+                  >
+                    <Database size={10} className="text-zinc-600 group-hover/cite:text-blue-500" />
+                    {children}
+                  </span>
+                );
+              }
+              return (
+                <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                  {children}
+                </a>
+              );
+            }
+          }}
+        >
+          {processed}
+        </ReactMarkdown>
       </div>
     );
   };
