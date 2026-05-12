@@ -88,7 +88,8 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
       const data = await res.json();
       if (Array.isArray(data)) setMessages(data);
     } catch (err) {
-      toast.error('Failed to reconstruct conversation history');
+      console.log('Could not load messages:', err);
+      // Don't show error toast — empty conversation is fine
     }
   };
 
