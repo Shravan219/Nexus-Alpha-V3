@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifySession, getSupabase, getEmbedding } from './_auth';
+import { verifySession, getSupabase, getEmbedding } from './_auth.js';
 import PDFParser from 'pdf2json';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));

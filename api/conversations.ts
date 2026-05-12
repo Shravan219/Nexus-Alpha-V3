@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifySession, getSupabase } from './_auth';
+import { verifySession, getSupabase } from './_auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const employee = await verifySession(req);
