@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { data: chunks, error: rpcError } = await supabaseAdmin.rpc('match_documents', {
       query_embedding: queryEmbedding,
-      match_threshold: 0.5,
+      match_threshold: 0.1,
       match_count: 8,
       filter_document_id: documentId || null
     });
