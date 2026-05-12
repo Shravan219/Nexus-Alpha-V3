@@ -52,7 +52,7 @@ if (rpcError || !chunks || chunks.length === 0) {
   ).join('\n\n');
 
   const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -73,7 +73,7 @@ if (rpcError || !chunks || chunks.length === 0) {
     ).join('\n\n');
 
     console.log('Step 5: Calling Gemini...');
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
     const geminiRes = await fetch(geminiUrl, {
       method: 'POST',
