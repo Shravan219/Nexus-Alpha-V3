@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const SYSTEM_PROMPT = `You are Nexus, an Institutional Memory Engine. Answer questions ONLY using the document context provided below. Never use your own training data under any circumstances.
+const SYSTEM_PROMPT = `You are Vaultic, an Institutional Memory Engine. Answer questions ONLY using the document context provided below. Never use your own training data under any circumstances.
 
 STRICT RULES:
 1. Every single claim must be immediately followed by a citation: [DOC: filename · Page #]

@@ -156,7 +156,7 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
       setTimeout(() => setLoadStep(2), 800);
       setTimeout(() => setLoadStep(3), 1600);
 
-      // 1. Call Nexus Neural API
+      // 1. Call Vaultic Neural API
       const res = await authFetch('/api/match-chunks', {
         method: 'POST',
         body: JSON.stringify({
@@ -189,7 +189,7 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
       onMessageSent?.();
 
     } catch (err: any) {
-      console.error('Nexus Send failed:', err);
+      console.error('Vaultic Send failed:', err);
       setError(`Neural Link Failure: ${err.message}`);
       toast.error(`Neural Link Failure: ${err.message}`);
     } finally {
@@ -253,7 +253,7 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono tracking-widest text-zinc-500 uppercase">Nexus Neural Core</span>
+            <span className="text-[10px] font-mono tracking-widest text-zinc-500 uppercase">Vaultic Neural Core</span>
             <span className="text-[9px] font-mono tracking-widest text-white/50 px-1.5 py-0.5 bg-zinc-950 border border-zinc-900 rounded select-none">v0.1.2-ALPHA</span>
           </div>
         </div>
@@ -408,7 +408,7 @@ export default function QueryEngine({ selectedDocId, conversationId, onConversat
         </form>
         <div className="flex items-center justify-between mt-4 px-1 pointer-events-auto">
           <p className="text-[8px] text-zinc-700 font-mono tracking-tighter uppercase">
-            Institutional Memory v0.1.2_Build-Nexus
+            Institutional Memory v0.1.2_Build-Vaultic
           </p>
           <div className="flex items-center gap-1.5 opacity-30 hover:opacity-100 transition-opacity">
             <div className="h-1 w-1 rounded-full bg-green-500" />

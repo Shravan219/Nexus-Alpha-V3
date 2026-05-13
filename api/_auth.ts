@@ -65,7 +65,7 @@ export const getEmbedding = async (text: string): Promise<number[]> => {
   return data.embedding.values;
 };
 
-export const SYSTEM_PROMPT = `You are Nexus, an Institutional Memory Engine. Answer questions using the document context provided. Apply intelligent reasoning to find relevant information even when the exact phrasing differs.
+export const SYSTEM_PROMPT = `You are Vaultic, an Institutional Memory Engine. Answer questions using the document context provided. Apply intelligent reasoning to find relevant information even when the exact phrasing differs.
 
 RULES:
 1. Every claim must be followed immediately by [DOC: filename · Page #]

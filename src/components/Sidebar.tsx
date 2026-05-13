@@ -20,7 +20,7 @@ export default function Sidebar({ activeTab, setActiveTab, documents, selectedDo
       <div className="p-6 border-b border-[#1a1a1a] flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="h-8 w-[3px] bg-blue-600" />
-          <h1 className="text-xl font-bold tracking-tighter text-white">NEXUS ALPHA</h1>
+          <h1 className="text-xl font-bold tracking-tighter text-white">VAULTIC</h1>
         </div>
       </div>
 

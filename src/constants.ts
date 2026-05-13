@@ -1,7 +1,7 @@
 import { version } from 'react';
 
 // Exporting React 19 version check for logging
-console.log(`Nexus Alpha initialized with React ${version}`);
+console.log(`Vaultic initialized with React ${version}`);
 
 export const RAG_CONFIG = {
   CHUNK_SIZE: 500,

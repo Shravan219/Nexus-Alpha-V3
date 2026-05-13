@@ -1,4 +1,4 @@
-# Database Setup for Nexus Alpha
+# Database Setup for Vaultic
 
 Execute the following SQL in your Supabase SQL Editor:
 

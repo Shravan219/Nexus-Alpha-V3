@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SESSION_TOKEN_KEY, SESSION_EMPLOYEE_KEY } from '@/lib/constants';
 
 interface LoginProps {
   onLogin: (employee: { id: string; name: string; role: string }) => void;
@@ -40,11 +41,11 @@ export const Login = ({ onLogin }: LoginProps) => {
       }
 
       // Store token
-      sessionStorage.setItem('nexus_session_token', data.token);
-      sessionStorage.setItem('nexus_employee', JSON.stringify(data.employee));
+      sessionStorage.setItem(SESSION_TOKEN_KEY, data.token);
+      sessionStorage.setItem(SESSION_EMPLOYEE_KEY, JSON.stringify(data.employee));
 
       // Verify storage worked
-      const storedToken = sessionStorage.getItem('nexus_session_token');
+      const storedToken = sessionStorage.getItem(SESSION_TOKEN_KEY);
       console.log('Stored token verification:', storedToken);
 
       if (!storedToken || storedToken === 'undefined') {
@@ -67,7 +68,7 @@ export const Login = ({ onLogin }: LoginProps) => {
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-2">
             <div className="w-1 h-6 bg-blue-600" />
-            <span className="text-white font-bold tracking-wider text-lg">NEXUS ALPHA</span>
+            <span className="text-white font-bold tracking-wider text-lg">VAULTIC</span>
           </div>
           <p className="text-zinc-500 text-xs tracking-widest">INSTITUTIONAL MEMORY ENGINE</p>
         </div>
