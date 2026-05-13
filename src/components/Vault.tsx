@@ -55,8 +55,8 @@ export default function Vault({ documents, onRefresh, isAdmin = false }: VaultPr
         method: 'DELETE'
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Purge failed');
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.error || `Purge failed with status ${res.status}`);
       }
       
       toast.success(`${doc.name} purged from vault`);

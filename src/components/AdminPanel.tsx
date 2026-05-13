@@ -19,10 +19,14 @@ export default function AdminPanel() {
   const fetchEmployees = async () => {
     try {
       const res = await authFetch('/api/employees');
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Server Error (${res.status}): ${errorText}`);
+      }
       const data = await res.json();
       if (Array.isArray(data)) setEmployees(data);
-    } catch (err) {
-      toast.error('Failed to fetch employees');
+    } catch (err: any) {
+      toast.error(`Failed to fetch employees: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -34,27 +38,35 @@ export default function AdminPanel() {
 
   const handleToggleActive = async (empId: string, currentStatus: boolean) => {
     try {
-      await authFetch(`/api/employees/${empId}`, {
+      const res = await authFetch(`/api/employees/${empId}`, {
         method: 'PATCH',
         body: JSON.stringify({ isActive: !currentStatus })
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Unknown server error' }));
+        throw new Error(data.error || `Status update failed (${res.status})`);
+      }
       fetchEmployees();
       toast.success(`Account ${!currentStatus ? 'activated' : 'deactivated'}`);
-    } catch (err) {
-      toast.error('Operation failed');
+    } catch (err: any) {
+      toast.error(err.message || 'Operation failed');
     }
   };
 
   const handleDelete = async (empId: string) => {
     if (!confirm('Permanently delete this employee account? This will orphan their conversations.')) return;
     try {
-      await authFetch(`/api/employees/${empId}`, {
+      const res = await authFetch(`/api/employees/${empId}`, {
         method: 'DELETE'
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Unknown server error' }));
+        throw new Error(data.error || `Deletion failed (${res.status})`);
+      }
       fetchEmployees();
       toast.success('Employee record purged');
-    } catch (err) {
-      toast.error('Deletion failed');
+    } catch (err: any) {
+      toast.error(err.message || 'Deletion failed');
     }
   };
 
