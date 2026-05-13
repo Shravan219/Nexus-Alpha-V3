@@ -2,12 +2,15 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifySession, getSupabase } from '../_auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const method = req.method?.toUpperCase();
+  console.log(`[API] Employees/Id request: ${method} ${req.url}`);
+
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (method === 'OPTIONS') return res.status(200).end();
 
   const employee = await verifySession(req);
   if (!employee) return res.status(401).json({ error: 'Session expired' });
@@ -17,9 +20,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const supabaseAdmin = getSupabase();
-  const { id } = req.query; // This will be the employee_id text in this app's logic
+  const id = req.query.id as string; // This will be the employee_id text in this app's logic
 
-  if (req.method === 'PATCH') {
+  if (method === 'PATCH') {
     try {
       const { isActive, role } = req.body;
       const updates: any = {};
@@ -40,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  if (req.method === 'DELETE') {
+  if (method === 'DELETE') {
     try {
       const { error } = await supabaseAdmin
         .from('employees')

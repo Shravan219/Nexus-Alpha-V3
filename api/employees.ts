@@ -2,12 +2,15 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifySession, getSupabase } from './_auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const method = req.method?.toUpperCase();
+  console.log(`[API] Employees request: ${method}`);
+
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (method === 'OPTIONS') return res.status(200).end();
 
   const employee = await verifySession(req);
   if (!employee) return res.status(401).json({ error: 'Session expired' });
@@ -19,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const supabaseAdmin = getSupabase();
 
-  if (req.method === 'GET') {
+  if (method === 'GET') {
     try {
       const { data, error } = await supabaseAdmin
         .from('employees')
