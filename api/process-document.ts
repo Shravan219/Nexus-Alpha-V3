@@ -22,17 +22,18 @@ const extractTextFromPDF = (buffer: Buffer): Promise<{page_number: number, text:
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  const employee = await verifySession(req);
-  if (!employee || employee.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
-
-  const supabaseAdmin = getSupabase();
-  const { documentId, fileUrl, filename } = req.body;
+  const method = req.method?.toUpperCase();
+  if (method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
+    const employee = await verifySession(req);
+    if (!employee || employee.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const supabaseAdmin = getSupabase();
+    const { documentId, fileUrl, filename } = req.body;
+
     await supabaseAdmin.from('documents').update({ status: 'processing' }).eq('id', documentId);
 
     const pdfRes = await fetch(fileUrl);

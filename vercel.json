@@ -11,6 +11,9 @@
     }
   },
   "rewrites": [
+    { "source": "/api/documents/:id", "destination": "/api/documents/[id].ts" },
+    { "source": "/api/employees/:id", "destination": "/api/employees/[id].ts" },
+    { "source": "/api/employees", "destination": "/api/employees/index.ts" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifySession, getSupabase } from './_auth.js';
+import { verifySession, getSupabase } from '../_auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const method = req.method?.toUpperCase();
-  console.log(`[API] Employees request: ${method}`);
+  console.log(`[API] Employees Index request: ${method}`);
 
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,18 +12,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (method === 'OPTIONS') return res.status(200).end();
 
-  const employee = await verifySession(req);
-  if (!employee) return res.status(401).json({ error: 'Session expired' });
+  try {
+    const employee = await verifySession(req);
+    if (!employee) return res.status(401).json({ error: 'Session expired' });
 
-  // Only admins can manage employees
-  if (employee.role !== 'admin') {
-    return res.status(403).json({ error: 'Unauthorized: Admin access required' });
-  }
+    // Only admins can manage employees
+    if (employee.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized: Admin access required' });
+    }
 
-  const supabaseAdmin = getSupabase();
+    const supabaseAdmin = getSupabase();
 
-  if (method === 'GET') {
-    try {
+    if (method === 'GET') {
       const { data, error } = await supabaseAdmin
         .from('employees')
         .select('*')
@@ -31,13 +31,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (error) throw error;
       return res.status(200).json(data || []);
-    } catch (err: any) {
-      return res.status(500).json({ error: err.message });
     }
-  }
 
-  if (req.method === 'POST') {
-    try {
+    if (method === 'POST') {
       const { employeeId, fullName, role } = req.body;
       const { data, error } = await supabaseAdmin
         .from('employees')
@@ -52,10 +48,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (error) throw error;
       return res.status(201).json(data);
-    } catch (err: any) {
-      return res.status(500).json({ error: err.message });
     }
-  }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: `Method ${method} not allowed on employees index` });
+  } catch (err: any) {
+    console.error('[API Error] Employees Index:', err);
+    return res.status(500).json({ error: err.message || 'Internal Server Error' });
+  }
 }

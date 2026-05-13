@@ -12,18 +12,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (method === 'OPTIONS') return res.status(200).end();
 
-  const employee = await verifySession(req);
-  if (!employee) return res.status(401).json({ error: 'Session expired' });
+  try {
+    const employee = await verifySession(req);
+    if (!employee) return res.status(401).json({ error: 'Session expired' });
 
-  if (employee.role !== 'admin') {
-    return res.status(403).json({ error: 'Unauthorized' });
-  }
+    if (employee.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
 
-  const supabaseAdmin = getSupabase();
-  const id = req.query.id as string; // This will be the employee_id text in this app's logic
+    const supabaseAdmin = getSupabase();
+    const id = req.query.id as string; // This will be the employee_id text in this app's logic
 
-  if (method === 'PATCH') {
-    try {
+    if (method === 'PATCH') {
       const { isActive, role } = req.body;
       const updates: any = {};
       if (isActive !== undefined) updates.is_active = isActive;
@@ -38,13 +38,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (error) throw error;
       return res.status(200).json(data);
-    } catch (err: any) {
-      return res.status(500).json({ error: err.message });
     }
-  }
 
-  if (method === 'DELETE') {
-    try {
+    if (method === 'DELETE') {
       const { error } = await supabaseAdmin
         .from('employees')
         .delete()
@@ -52,10 +48,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (error) throw error;
       return res.status(200).json({ success: true });
-    } catch (err: any) {
-      return res.status(500).json({ error: err.message });
     }
-  }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: `Method ${method} not allowed on employee detail (ID: ${id})` });
+  } catch (err: any) {
+    console.error('[API Error] Employees/Id:', err);
+    return res.status(500).json({ error: err.message || 'Internal Server Error' });
+  }
 }

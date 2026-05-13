@@ -2,14 +2,14 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifySession, getSupabase, getEmbedding, SYSTEM_PROMPT } from './_auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  const employee = await verifySession(req);
-  if (!employee) return res.status(401).json({ error: 'Session expired' });
-
-  const supabaseAdmin = getSupabase();
+  const method = req.method?.toUpperCase();
+  if (method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
+    const employee = await verifySession(req);
+    if (!employee) return res.status(401).json({ error: 'Session expired' });
+
+    const supabaseAdmin = getSupabase();
     const { query, documentId, conversationId } = req.body;
     console.log('Step 1: Query received:', query);
 
