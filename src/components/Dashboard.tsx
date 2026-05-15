@@ -8,18 +8,6 @@ import { formatDistanceToNow } from 'date-fns';
 
 import ActivationModal from '@/components/ActivationModal';
 
-export function DashboardPage() {
-  return (
-    <div>
-      {/* Temporarily render the modal for testing */}
-      <ActivationModal /> 
-      
-      {/* The rest of your regular dashboard code stays safe below */}
-      <main>Your cool dashboard app content...</main>
-    </div>
-  );
-}
-
 interface DashboardProps {
   documents: Document[];
   conversations: Conversation[];
@@ -31,6 +19,9 @@ export default function Dashboard({ documents, conversations, onNavigateToDocs }
 
   return (
     <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
+
+    <ActivationModal /> 
+    
       <div className="space-y-2">
         <h2 className="text-4xl font-bold tracking-tighter">Operational Overview</h2>
         <p className="text-zinc-500 font-mono text-sm tracking-widest uppercase">System Metrics & Vital Signs</p>
