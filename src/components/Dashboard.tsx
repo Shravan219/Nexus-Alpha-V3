@@ -3,17 +3,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { Document, Conversation } from '@/lib/supabase';
-import { FileText, Cpu, MessageSquareText, ShieldCheck, Database } from 'lucide-react';
+import { FileText, MessageSquareText, ShieldCheck, Database } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
-// Import your custom Web3 activation modal
+// 🟢 Using the default import to match option A and keep compilation clean
 import ActivationModal from '@/components/ActivationModal';
 
 interface DashboardProps {
   documents: Document[];
   conversations: Conversation[];
   onNavigateToDocs: () => void;
-  isLicenseActive: boolean; // 🟢 Track company-wide unlock status smoothly
+  isLicenseActive: boolean; // 🟢 Pass this down from your root wrapper layout fetch
 }
 
 export default function Dashboard({ documents, conversations, onNavigateToDocs, isLicenseActive }: DashboardProps) {
@@ -22,7 +22,7 @@ export default function Dashboard({ documents, conversations, onNavigateToDocs, 
   return (
     <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar relative">
       
-      {/* 🟢 If the company license is false, lock down the interface overlay natively */}
+      {/* 🔐 SCREEN LOCK: Displays if your license verification switch returns false */}
       {!isLicenseActive && <ActivationModal />}
 
       <div className="space-y-2">
