@@ -5,17 +5,21 @@
     "api/**/*.ts": { "maxDuration": 60 }
   },
   "rewrites": [
-    /* 1. Explicit Dynamic Sub-routes using standard parameter tokens */
+    /* 1. Explicit routing for nested endpoints using standard wildcards */
     { "source": "/api/documents/:id", "destination": "/api/documents/_id.ts" },
     { "source": "/api/employees/:id", "destination": "/api/employees/_id.ts" },
-    
-    /* 2. Static Folder Level Fallbacks */
     { "source": "/api/employees", "destination": "/api/employees/index.ts" },
-    
-    /* 3. Global Top-Level API Catch-All (Passes through to files like process-document.ts) */
-    { "source": "/api/:path*", "destination": "/api/:path*.ts" },
-    
-    /* 4. Single Page Application (SPA) Frontend Routing Wrapper */
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+
+    /* 2. Explicitly map your top-level endpoints one-by-one so we can avoid global regex lookaheads */
+    { "source": "/api/verify-license", "destination": "/api/verify-license.ts" },
+    { "source": "/api/process-document", "destination": "/api/process-document.ts" },
+    { "source": "/api/messages", "destination": "/api/messages.ts" },
+    { "source": "/api/match-chunks", "destination": "/api/match-chunks.ts" },
+    { "source": "/api/conversations", "destination": "/api/conversations.ts" },
+    { "source": "/api/ping", "destination": "/api/ping.ts" },
+    { "source": "/api/debug-employees", "destination": "/api/debug-employees.ts" },
+
+    /* 3. Global Single Page Application Fallback */
+    { "source": "/:path*", "destination": "/index.html" }
   ]
 }
