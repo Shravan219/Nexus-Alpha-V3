@@ -6,6 +6,20 @@ import type { Document, Conversation } from '@/lib/supabase';
 import { FileText, Cpu, MessageSquareText, ShieldCheck, Database, Zap, BookOpen } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
+import ActivationModal from '@/components/ActivationModal';
+
+export default function DashboardPage() {
+  return (
+    <div>
+      {/* Temporarily render the modal for testing */}
+      <ActivationModal /> 
+      
+      {/* The rest of your regular dashboard code stays safe below */}
+      <main>Your cool dashboard app content...</main>
+    </div>
+  );
+}
+
 interface DashboardProps {
   documents: Document[];
   conversations: Conversation[];
