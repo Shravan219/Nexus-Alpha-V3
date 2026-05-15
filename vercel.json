@@ -5,10 +5,17 @@
     "api/**/*.ts": { "maxDuration": 60 }
   },
   "rewrites": [
+    /* 1. Explicit Dynamic Sub-routes using standard parameter tokens */
     { "source": "/api/documents/:id", "destination": "/api/documents/_id.ts" },
     { "source": "/api/employees/:id", "destination": "/api/employees/_id.ts" },
+    
+    /* 2. Static Folder Level Fallbacks */
     { "source": "/api/employees", "destination": "/api/employees/index.ts" },
-    { "source": "/api/(.*)", "destination": "/api/$1" },
+    
+    /* 3. Global Top-Level API Catch-All (Passes through to files like process-document.ts) */
+    { "source": "/api/:path*", "destination": "/api/:path*.ts" },
+    
+    /* 4. Single Page Application (SPA) Frontend Routing Wrapper */
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
