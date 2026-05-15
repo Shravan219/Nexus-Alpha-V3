@@ -1,23 +1,18 @@
 {
   "regions": ["iad1"],
   "functions": {
-    "api/*.ts": { "maxDuration": 60 },
-    "api/**/*.ts": { "maxDuration": 60 }
+    "api/*.ts": {
+      "maxDuration": 60
+    },
+    "api/**/*.ts": {
+      "maxDuration": 60
+    }
   },
   "rewrites": [
-    /* 1. Precise Dynamic Route Rewrites (Matching your renamed files) */
     { "source": "/api/documents/:id", "destination": "/api/documents/_id.ts" },
     { "source": "/api/employees/:id", "destination": "/api/employees/_id.ts" },
-    
-    /* 2. Subfolder Explicit Fallbacks */
-    { "source": "/api/auth/:path*", "destination": "/api/auth/:path*.ts" },
-    { "source": "/api/documents", "destination": "/api/documents/index.ts" },
     { "source": "/api/employees", "destination": "/api/employees/index.ts" },
-    
-    /* 3. Base API Route Rule - Catches top-level files like process-document.ts */
-    { "source": "/api/:path", "destination": "/api/:path.ts" },
-    
-    /* 4. Global Frontend SPA Rule - MUST BE LAST */
+    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

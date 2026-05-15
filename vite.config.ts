@@ -14,6 +14,15 @@ export default defineConfig({
     hmr: process.env.DISABLE_HMR !== 'true',
   },
   build: {
-    chunkSizeWarningLimit: 1200 // Safe overhead padding for dashboard UI assets
+    chunkSizeWarningLimit: 1200, // Safe overhead padding for dashboard UI assets
+    rollupOptions: {
+      output: {
+        // Clean, minimal manual chunking to avoid AST bundle corruption
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+        }
+      }
+    }
   }
 });

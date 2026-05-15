@@ -21,18 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const supabaseAdmin = getSupabase();
-    const id = req.query.id as string; // employee_id
-
-    if (method === 'GET') {
-      if (!id) return res.status(400).json({ error: 'ID required' });
-       const { data, error } = await supabaseAdmin
-        .from('employees')
-        .select('*')
-        .eq('employee_id', id)
-        .single();
-      if (error) throw error;
-      return res.status(200).json(data);
-    }
+    const id = req.query.id as string; // This will be the employee_id text in this app's logic
 
     if (method === 'PATCH') {
       const { isActive, role } = req.body;
