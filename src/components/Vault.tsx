@@ -51,7 +51,7 @@ export default function Vault({ documents, onRefresh, isAdmin = false }: VaultPr
   const deleteDocument = async (doc: Document) => {
     if (!confirm(`Purge ${doc.name} and all associated neural weights?`)) return;
     try {
-      const res = await authFetch(`/api/documents/${doc.id}`, {
+      const res = await authFetch(`/api/documents?id=${doc.id}`, {
         method: 'DELETE'
       });
       if (!res.ok) {
