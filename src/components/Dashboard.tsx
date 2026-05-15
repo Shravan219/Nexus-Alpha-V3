@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 import type { Document, Conversation } from '@/lib/supabase';
 import { FileText, MessageSquareText, ShieldCheck, Database } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -12,24 +13,49 @@ interface DashboardProps {
   documents: Document[];
   conversations: Conversation[];
   onNavigateToDocs: () => void;
-  initialLicenseStatus: boolean; // Pass down what the database says on first load
-  licenseKey: string;            // Pass down the current user's license key
+  licenseKey: string;            // Passed down from your user context
+  initialTxHash: string | null;  // Pass current transaction_hash column string value from DB
 }
 
-export default function Dashboard({ documents, conversations, onNavigateToDocs, initialLicenseStatus, licenseKey }: DashboardProps) {
+export default function Dashboard({ documents, conversations, onNavigateToDocs, licenseKey, initialTxHash }: DashboardProps) {
   const totalChunks = documents.reduce((acc, doc) => acc + (doc.chunk_count || 0), 0);
   
-  // Manage the lock dynamically in React memory
-  const [active, setActive] = useState(initialLicenseStatus);
+  // Track the current transaction hash in state. 
+  // If it's valid (starts with '0x'), the workspace is unlocked.
+  const [currentTxHash, setCurrentTxHash] = useState<string | null>(initialTxHash);
+
+  // 🔄 REALTIME DATABASE LISTENER: Listens for automatic backend changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('live-license-tracking')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', filter: `license_key=eq.${licenseKey}`, schema: 'public', table: 'licenses' },
+        (payload) => {
+          if (payload.new && payload.new.transaction_hash) {
+            // Update local memory state automatically when database updates
+            setCurrentTxHash(payload.new.transaction_hash);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [licenseKey]);
+
+  // Derive access status dynamically
+  const isUnlocked = !!(currentTxHash && currentTxHash.startsWith('0x'));
 
   return (
     <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar relative">
       
-      {/* 🔐 If active state is false, display lock. When success triggers, setActive(true) hides it instantly! */}
-      {!active && (
+      {/* 🔐 If a transaction hash isn't present in the database, lock screen. */}
+      {!isUnlocked && (
         <ActivationModal 
           licenseKey={licenseKey} 
-          onVerificationSuccess={() => setActive(true)} 
+          onSuccess={() => setCurrentTxHash("0x_LOCAL_UNLOCK_TRIGGER")} 
         />
       )}
 
