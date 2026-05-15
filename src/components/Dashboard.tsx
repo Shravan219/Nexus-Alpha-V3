@@ -1,167 +1,50 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import type { Document, Conversation } from '@/lib/supabase';
-import { FileText, MessageSquareText, ShieldCheck, Database } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import Dashboard from './components/Dashboard';
+import ActivationModal from './components/ActivationModal';
+import LoginScreen from './components/LoginScreen'; // Or your existing login component
 
-import ActivationModal from '@/components/ActivationModal';
+export default function App() {
+  const [session, setSession] = useState<any>(null);
+  const [licenseKey, setLicenseKey] = useState('TEST-KEY-123'); // Hardcoded or pulled from context
+  const [isPaid, setIsPaid] = useState<boolean | null>(null);
 
-interface DashboardProps {
-  documents: Document[];
-  conversations: Conversation[];
-  onNavigateToDocs: () => void;
-  licenseKey: string;            // Passed down from your user context
-  initialTxHash: string | null;  // Pass current transaction_hash column string value from DB
-}
-
-export default function Dashboard({ documents, conversations, onNavigateToDocs, licenseKey, initialTxHash }: DashboardProps) {
-  const totalChunks = documents.reduce((acc, doc) => acc + (doc.chunk_count || 0), 0);
-  
-  // Track the current transaction hash in state. 
-  // If it's valid (starts with '0x'), the workspace is unlocked.
-  const [currentTxHash, setCurrentTxHash] = useState<string | null>(initialTxHash);
-
-  // 🔄 REALTIME DATABASE LISTENER: Listens for automatic backend changes
+  // 1. Initial check on load
   useEffect(() => {
-    const channel = supabase
-      .channel('live-license-tracking')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', filter: `license_key=eq.${licenseKey}`, schema: 'public', table: 'licenses' },
-        (payload) => {
-          if (payload.new && payload.new.transaction_hash) {
-            // Update local memory state automatically when database updates
-            setCurrentTxHash(payload.new.transaction_hash);
-          }
-        }
-      )
-      .subscribe();
+    async function checkLicenseStatus() {
+      const { data, error } = await supabase
+        .from('licenses')
+        .select('transaction_hash')
+        .eq('license_key', licenseKey)
+        .single();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      if (data && data.transaction_hash && data.transaction_hash.startsWith('0x')) {
+        setIsPaid(true);
+      } else {
+        setIsPaid(false);
+      }
+    }
+    checkLicenseStatus();
   }, [licenseKey]);
 
-  // Derive access status dynamically
-  const isUnlocked = !!(currentTxHash && currentTxHash.startsWith('0x'));
+  // Loading state while checking database
+  if (isPaid === null) return <div className="min-h-screen bg-black text-white p-10 font-mono">Verifying Gateway Status...</div>;
 
-  return (
-    <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar relative">
-      
-      {/* 🔐 If a transaction hash isn't present in the database, lock screen. */}
-      {!isUnlocked && (
-        <ActivationModal 
-          licenseKey={licenseKey} 
-          onSuccess={() => setCurrentTxHash("0x_LOCAL_UNLOCK_TRIGGER")} 
-        />
-      )}
+  // ➔ STEP 1: If not paid, user ONLY sees the payment screen. No dashboard layout exists yet.
+  if (!isPaid) {
+    return (
+      <ActivationModal 
+        licenseKey={licenseKey} 
+        onPaymentComplete={() => setIsPaid(true)} // 🟢 Force the immediate component swap
+      />
+    );
+  }
 
-      <div className="space-y-2">
-        <h2 className="text-4xl font-bold tracking-tighter">Operational Overview</h2>
-        <p className="text-zinc-500 font-mono text-sm tracking-widest uppercase">System Metrics & Vital Signs</p>
-      </div>
+  // ➔ STEP 2: Once isPaid is TRUE, the payment screen completely unmounts, and they see the Login screen
+  if (!session) {
+    return <LoginScreen onLoginSuccess={() => setSession(true)} />;
+  }
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={<FileText className="text-blue-500" />} label="Total Documents" value={documents.length} />
-        <StatCard icon={<Database className="text-zinc-400" />} label="Knowledge Chunks" value={totalChunks.toLocaleString()} />
-        <StatCard icon={<MessageSquareText className="text-zinc-400" />} label="Conversations" value={conversations.length} />
-        <StatCard icon={<ShieldCheck className="text-green-500" />} label="Vector DB Active" value="ONLINE" status="active" />
-      </div>
-
-      {/* Data Visuals Pipeline Split */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <Card className="bg-[#0a0a0a] border-[#1a1a1a] text-white">
-          <CardHeader className="border-b border-[#1a1a1a]">
-            <CardTitle className="text-sm font-mono tracking-widest uppercase flex items-center justify-between">
-              Recent Intakes
-              <button onClick={onNavigateToDocs} className="text-[10px] text-blue-500 hover:underline">View Vault</button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {documents.length === 0 ? (
-              <div className="p-10 text-center text-zinc-600 text-sm">No data in pipeline</div>
-            ) : (
-              <div className="divide-y divide-[#1a1a1a]">
-                {documents.slice(0, 5).map(doc => (
-                  <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-zinc-900/50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded bg-zinc-900 flex items-center justify-center">
-                        <FileText size={14} className="text-zinc-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium truncate max-w-[200px]">{doc.name}</p>
-                        <p className="text-[10px] text-zinc-500">{formatDistanceToNow(new Date(doc.created_at))} ago</p>
-                      </div>
-                    </div>
-                    <div className={cn(
-                      "text-[10px] font-mono px-2 py-0.5 rounded border",
-                      doc.status === 'ready' ? "border-green-500/20 text-green-500" : 
-                      doc.status === 'processing' ? "border-yellow-500/20 text-yellow-500" :
-                      "border-red-500/20 text-red-500"
-                    )}>
-                      {doc.status.toUpperCase()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-[#0a0a0a] border-[#1a1a1a] text-white">
-          <CardHeader className="border-b border-[#1a1a1a]">
-            <CardTitle className="text-sm font-mono tracking-widest uppercase">System Protocol</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6 space-y-6">
-            <div className="flex gap-4">
-              <div className="mt-1 h-2 w-2 rounded-full bg-blue-600 shrink-0" />
-              <div>
-                <p className="text-sm font-bold">1. Ingestion Pipeline</p>
-                <p className="text-xs text-zinc-500 mt-1">Upload institutional PDFs. The engine extracts text and generates high-dimensional embeddings via Gemini gemini-embedding-001.</p>
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <div className="mt-1 h-2 w-2 rounded-full bg-blue-600 shrink-0" />
-              <div>
-                <p className="text-sm font-bold">2. Semantic Indexing</p>
-                <p className="text-xs text-zinc-500 mt-1">Vectors are stored in pgvector. Every query triggers a similarity search to find the most relevant institutional fragments.</p>
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <div className="mt-1 h-2 w-2 rounded-full bg-blue-600 shrink-0" />
-              <div>
-                <p className="text-sm font-bold">3. Grounded Synthesis</p>
-                <p className="text-xs text-zinc-500 mt-1">Gemini 2.5 Flash synthesizes answers using ONLY found context, including mandatory filename and page citations.</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ icon, label, value, status }: { icon: React.ReactNode, label: string, value: string | number, status?: string }) {
-  return (
-    <Card className="bg-[#0a0a0a] border-[#1a1a1a] text-white hover:border-zinc-800 transition-all group">
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="h-10 w-10 rounded-lg bg-zinc-950 border border-zinc-900 flex items-center justify-center group-hover:scale-110 transition-transform">
-            {icon}
-          </div>
-          {status && (
-            <Badge className="bg-green-500/10 text-green-500 border-green-500/20 text-[10px] font-mono">
-              STABLE
-            </Badge>
-          )}
-        </div>
-        <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">{label}</p>
-        <p className="text-3xl font-bold tracking-tighter mt-1">{value}</p>
-      </CardContent>
-    </Card>
-  );
+  // ➔ STEP 3: After login, they access the operational dashboard
+  return <Dashboard licenseKey={licenseKey} isLicenseActive={true} documents={[]} conversations={[]} onNavigateToDocs={() => {}} />;
 }

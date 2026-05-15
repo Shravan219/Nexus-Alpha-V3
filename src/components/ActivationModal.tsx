@@ -6,81 +6,77 @@ const TEST_PRICE_HEX = "0x2386F26FC10000"; // 0.01 POL
 
 interface ActivationModalProps {
   licenseKey: string;
-  onSuccess: () => void; // Instantly drops the layout wall on completion
+  onPaymentComplete: () => void;
 }
 
-export default function ActivationModal({ licenseKey, onSuccess }: ActivationModalProps) {
+export default function ActivationModal({ licenseKey, onPaymentComplete }: ActivationModalProps) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
 
-  const handlePaymentAndAutoUnlock = async () => {
+  const handlePaymentFlow = async () => {
     if (typeof window !== 'undefined' && !window.ethereum) {
-      alert("Please install MetaMask.");
+      alert("MetaMask is required.");
       return;
     }
 
     try {
       setLoading(true);
-      setStatus("Connecting wallet...");
+      setStatus("Awaiting Connection...");
 
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       const userWallet = accounts[0];
 
-      setStatus("Awaiting signature...");
-      const agreementText = `BY SIGNING, YOU AUTOMATICALLY ACTIVATE LICENSE: ${licenseKey}`;
+      setStatus("Signing Terms...");
+      const agreementText = `UNLOCKING SYSTEM ACCESS FOR KEY: ${licenseKey}`;
       await window.ethereum.request({
         method: 'personal_sign',
         params: [agreementText, userWallet],
       });
 
-      setStatus("Processing transaction...");
+      setStatus("Sending Payment...");
       const txHash = await window.ethereum.request({
         method: 'eth_sendTransaction',
-        params: [{
-          from: userWallet,
-          to: DEVELOPER_WALLET,
-          value: TEST_PRICE_HEX,
-        }],
+        params: [{ from: userWallet, to: DEVELOPER_WALLET, value: TEST_PRICE_HEX }],
       });
 
-      setStatus("Syncing with ledger...");
+      setStatus("Flipping Database Switches...");
 
-      // 🤖 THE AUTOMATION: Pushes hash to licenses table, changing state immediately
+      // 🤖 AUTOMATIC DATABASE TRIGGER
       const { error } = await supabase
         .from('licenses')
         .update({
-          transaction_hash: txHash,
+          is_active: true,            // Automatically sets cell to TRUE
+          transaction_hash: txHash,   // Saves the transaction hash
           payment_received_at: new Date().toISOString()
         })
         .eq('license_key', licenseKey);
 
       if (error) throw error;
 
-      setStatus("Success!");
-      // Force the parent container to clear the screen lock overlay right now
-      onSuccess();
+      setStatus("Unlocked!");
+      
+      // 🟢 This instantly fires the screen swap to the Login Screen
+      onPaymentComplete();
 
     } catch (err) {
       console.error(err);
-      setStatus("Verification failed.");
+      setStatus("Payment failed or aborted.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-50 text-white">
-      <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl max-w-md w-full text-center space-y-6">
-        <h2 className="text-xl font-bold font-mono tracking-tight text-orange-500">WORKSPACE SECURED</h2>
-        <p className="text-sm text-zinc-400">
-          License Key <code className="bg-zinc-950 px-2 py-1 rounded text-zinc-300 font-mono text-xs">{licenseKey}</code> requires validation.
-        </p>
+    <div className="min-h-screen bg-black flex items-center justify-center p-6 text-white font-mono">
+      <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-lg max-w-sm w-full text-center space-y-6">
+        <h1 className="text-xl font-bold tracking-widest text-orange-500">GATEWAY LOCKED</h1>
+        <p className="text-xs text-zinc-400">License verification required to initialize authorization protocols.</p>
         <button
-          onClick={handlePaymentAndAutoUnlock}
+          onClick={handlePaymentFlow}
           disabled={loading}
-          className="w-full bg-orange-600 hover:bg-orange-500 disabled:bg-zinc-800 transition font-mono p-3 rounded text-sm uppercase tracking-wider font-bold"
+          className="w-full bg-orange-600 hover:bg-orange-500 p-3 text-xs uppercase tracking-widest font-bold rounded text-white"
         >
-          {loading ? status : "Verify & Unlock Dashboard"}
+          {loading ? status : "Process Activation"}
         </button>
       </div>
     </div>
