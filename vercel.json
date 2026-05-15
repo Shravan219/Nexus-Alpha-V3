@@ -5,12 +5,10 @@
     "api/**/*.ts": { "maxDuration": 60 }
   },
   "rewrites": [
-    /* 1. Explicit routing for nested endpoints using standard wildcards */
     { "source": "/api/documents/:id", "destination": "/api/documents/_id.ts" },
     { "source": "/api/employees/:id", "destination": "/api/employees/_id.ts" },
     { "source": "/api/employees", "destination": "/api/employees/index.ts" },
 
-    /* 2. Explicitly map your top-level endpoints one-by-one so we can avoid global regex lookaheads */
     { "source": "/api/verify-license", "destination": "/api/verify-license.ts" },
     { "source": "/api/process-document", "destination": "/api/process-document.ts" },
     { "source": "/api/messages", "destination": "/api/messages.ts" },
@@ -19,7 +17,6 @@
     { "source": "/api/ping", "destination": "/api/ping.ts" },
     { "source": "/api/debug-employees", "destination": "/api/debug-employees.ts" },
 
-    /* 3. Global Single Page Application Fallback */
     { "source": "/:path*", "destination": "/index.html" }
   ]
 }
