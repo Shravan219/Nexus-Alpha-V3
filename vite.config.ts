@@ -1,35 +1,28 @@
-// vite.config.ts
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
-  return {
-    plugins: [react(), tailwindcss()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
     },
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, './src'),
-      },
-    },
-    server: {
-      hmr: process.env.DISABLE_HMR !== 'true',
-    },
-    build: {
-      chunkSizeWarningLimit: 1000, // Safely handle enterprise dashboard UI footprints
-      rollupOptions: {
-        output: {
-          // Clean splitting strategy without manual mapping functions to eliminate circular chunking flags
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom'],
-            'vendor-database': ['@supabase/supabase-js'],
-          }
-        },
-      },
-    },
-  };
+  },
+  server: {
+    hmr: process.env.DISABLE_HMR !== 'true',
+  },
+  build: {
+    chunkSizeWarningLimit: 1200, // Safe overhead padding for dashboard UI assets
+    rollupOptions: {
+      output: {
+        // Clean, minimal manual chunking to avoid AST bundle corruption
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+        }
+      }
+    }
+  }
 });
