@@ -1,22 +1,10 @@
 {
   "regions": ["iad1"],
   "functions": {
-    "api/*.ts": { "maxDuration": 60 },
     "api/**/*.ts": { "maxDuration": 60 }
   },
   "rewrites": [
-    { "source": "/api/documents/:id", "destination": "/api/documents/_id.ts" },
-    { "source": "/api/employees/:id", "destination": "/api/employees/_id.ts" },
-    { "source": "/api/employees", "destination": "/api/employees/index.ts" },
-
-    { "source": "/api/verify-license", "destination": "/api/verify-license.ts" },
-    { "source": "/api/process-document", "destination": "/api/process-document.ts" },
-    { "source": "/api/messages", "destination": "/api/messages.ts" },
-    { "source": "/api/match-chunks", "destination": "/api/match-chunks.ts" },
-    { "source": "/api/conversations", "destination": "/api/conversations.ts" },
-    { "source": "/api/ping", "destination": "/api/ping.ts" },
-    { "source": "/api/debug-employees", "destination": "/api/debug-employees.ts" },
-
+    { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/:path*", "destination": "/index.html" }
   ]
 }
