@@ -5,8 +5,10 @@
     "api/**/*.ts": { "maxDuration": 60 }
   },
   "rewrites": [
-    { "source": "/api/documents/:id", "destination": "/api/documents/_id.ts" },
-    { "source": "/api/employees/:id", "destination": "/api/employees/_id.ts" },
+    /* Strict Regex parameter matching to completely eliminate 404 drops */
+    { "source": "/api/documents/(?<id>[^/]+)", "destination": "/api/documents/_id.ts?id=$id" },
+    { "source": "/api/employees/(?<id>[^/]+)", "destination": "/api/employees/_id.ts?id=$id" },
+    
     { "source": "/api/employees", "destination": "/api/employees/index.ts" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
