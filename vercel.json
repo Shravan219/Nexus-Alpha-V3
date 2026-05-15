@@ -1,6 +1,13 @@
 {
+  "version": 2,
+  "functions": {
+    "api/*.ts": { "maxDuration": 60 },
+    "api/**/*.ts": { "maxDuration": 60 }
+  },
   "rewrites": [
+    { "source": "/api/documents/:id", "destination": "/api/documents/detail.ts?id=:id" },
+    { "source": "/api/employees/:id", "destination": "/api/employees/detail.ts?id=:id" },
     { "source": "/api/employees", "destination": "/api/employees/index.ts" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
