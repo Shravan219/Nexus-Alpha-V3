@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -6,24 +6,32 @@ import type { Document, Conversation } from '@/lib/supabase';
 import { FileText, MessageSquareText, ShieldCheck, Database } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
-// 🟢 Using the default import to match option A and keep compilation clean
 import ActivationModal from '@/components/ActivationModal';
 
 interface DashboardProps {
   documents: Document[];
   conversations: Conversation[];
   onNavigateToDocs: () => void;
-  isLicenseActive: boolean; // 🟢 Pass this down from your root wrapper layout fetch
+  initialLicenseStatus: boolean; // Pass down what the database says on first load
+  licenseKey: string;            // Pass down the current user's license key
 }
 
-export default function Dashboard({ documents, conversations, onNavigateToDocs, isLicenseActive }: DashboardProps) {
+export default function Dashboard({ documents, conversations, onNavigateToDocs, initialLicenseStatus, licenseKey }: DashboardProps) {
   const totalChunks = documents.reduce((acc, doc) => acc + (doc.chunk_count || 0), 0);
+  
+  // Manage the lock dynamically in React memory
+  const [active, setActive] = useState(initialLicenseStatus);
 
   return (
     <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar relative">
       
-      {/* 🔐 SCREEN LOCK: Displays if your license verification switch returns false */}
-      {!isLicenseActive && <ActivationModal />}
+      {/* 🔐 If active state is false, display lock. When success triggers, setActive(true) hides it instantly! */}
+      {!active && (
+        <ActivationModal 
+          licenseKey={licenseKey} 
+          onVerificationSuccess={() => setActive(true)} 
+        />
+      )}
 
       <div className="space-y-2">
         <h2 className="text-4xl font-bold tracking-tighter">Operational Overview</h2>
