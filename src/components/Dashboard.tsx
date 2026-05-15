@@ -1,32 +1,36 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { Document, Conversation } from '@/lib/supabase';
-import { FileText, Cpu, MessageSquareText, ShieldCheck, Database, Zap, BookOpen } from 'lucide-react';
+import { FileText, Cpu, MessageSquareText, ShieldCheck, Database } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
-import ActivationModal from '@/components/ActivationModal';
+// Import your custom Web3 activation modal
+import { ActivationModal } from '@/components/ActivationModal';
 
 interface DashboardProps {
   documents: Document[];
   conversations: Conversation[];
   onNavigateToDocs: () => void;
+  isLicenseActive: boolean; // 🟢 Track company-wide unlock status smoothly
 }
 
-export default function Dashboard({ documents, conversations, onNavigateToDocs }: DashboardProps) {
+export default function Dashboard({ documents, conversations, onNavigateToDocs, isLicenseActive }: DashboardProps) {
   const totalChunks = documents.reduce((acc, doc) => acc + (doc.chunk_count || 0), 0);
 
   return (
-    <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
+    <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar relative">
+      
+      {/* 🟢 If the company license is false, lock down the interface overlay natively */}
+      {!isLicenseActive && <ActivationModal />}
 
-    <ActivationModal /> 
-    
       <div className="space-y-2">
         <h2 className="text-4xl font-bold tracking-tighter">Operational Overview</h2>
         <p className="text-zinc-500 font-mono text-sm tracking-widest uppercase">System Metrics & Vital Signs</p>
       </div>
 
+      {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={<FileText className="text-blue-500" />} label="Total Documents" value={documents.length} />
         <StatCard icon={<Database className="text-zinc-400" />} label="Knowledge Chunks" value={totalChunks.toLocaleString()} />
@@ -34,6 +38,7 @@ export default function Dashboard({ documents, conversations, onNavigateToDocs }
         <StatCard icon={<ShieldCheck className="text-green-500" />} label="Vector DB Active" value="ONLINE" status="active" />
       </div>
 
+      {/* Data Visuals Pipeline Split */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <Card className="bg-[#0a0a0a] border-[#1a1a1a] text-white">
           <CardHeader className="border-b border-[#1a1a1a]">

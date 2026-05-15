@@ -8,50 +8,48 @@ export default function ActivationModal() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
 
-  const handleSignAndPay = async () => {
-    // Check if window.ethereum is available (MetaMask installed)
-    if (typeof window !== 'undefined' && !window.ethereum) {
-      alert("Please install MetaMask to proceed with the activation.");
-      return;
-    }
+const handleSignAndPay = async (companyLicenseKey: string) => {
+  if (typeof window !== 'undefined' && !window.ethereum) {
+    alert("Please install MetaMask.");
+    return;
+  }
 
-    try {
-      setLoading(true);
-      setStatus("Connecting wallet...");
+  try {
+    setLoading(true);
+    setStatus("Connecting wallet...");
 
-      // Request user wallet connection
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      const userWallet = accounts[0];
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const userWallet = accounts[0];
 
-      // 1. Trigger the agreement cryptographic signature
-      setStatus("Awaiting signature...");
-      const agreementText = "BY SIGNING THIS TRANSACTION, YOU OFFICIALLY AGREE TO THE VAULTIC SAAS INTERNAL-USE AGREEMENT PROHIBITING REVERSE ENGINEERING AND DATA SCRAPING.";
-      await window.ethereum.request({
-        method: 'personal_sign',
-        params: [agreementText, userWallet],
-      });
+    // 1. Legal Contract Signature
+    setStatus("Awaiting signature...");
+    const agreementText = `BY SIGNING, YOU ACTIVATING THE LICENSE KEY: ${companyLicenseKey}.`;
+    await window.ethereum.request({
+      method: 'personal_sign',
+      params: [agreementText, userWallet],
+    });
 
-      // 2. Trigger the test network payment
-      setStatus("Processing network payment...");
-      const txHash = await window.ethereum.request({
-        method: 'eth_sendTransaction',
-        params: [{
-          from: userWallet,
-          to: DEVELOPER_WALLET,
-          value: TEST_PRICE_HEX,
-        }],
-      });
+    // 2. Mainnet / Testnet Payment Transmission
+    setStatus("Processing payment...");
+    const txHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: userWallet,
+        to: DEVELOPER_WALLET,
+        value: TEST_PRICE_HEX,
+      }],
+    });
 
-      setStatus("Complete!");
-      alert(`Success! Copy this TxHash for step 4: ${txHash}`);
-
-    } catch (error: any) {
-      console.error("Transaction Failed:", error);
-      setStatus("Transaction failed or canceled.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Alert the user to give you the TxHash and their License Key
+    alert(`Success! Copy this TxHash: ${txHash}`);
+    
+  } catch (error) {
+    console.error(error);
+    setStatus("Transaction failed.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 text-white font-sans">
