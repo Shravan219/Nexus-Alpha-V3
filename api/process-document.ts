@@ -25,16 +25,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const method = req.method?.toUpperCase();
   if (method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  const supabaseAdmin = getSupabase();
+  let docId: string | null = null;
+
   try {
     const employee = await verifySession(req);
     if (!employee || employee.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const supabaseAdmin = getSupabase();
     const { documentId, fileUrl, filename } = req.body;
+    docId = documentId;
 
-    await supabaseAdmin.from('documents').update({ status: 'processing' }).eq('id', documentId);
+    await supabaseAdmin.from('documents').update({ status: 'processing' }).eq('id', docId);
 
     const pdfRes = await fetch(fileUrl);
     const buffer = Buffer.from(await pdfRes.arrayBuffer());
@@ -43,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { count } = await supabaseAdmin
       .from('document_chunks')
       .select('*', { count: 'exact', head: true })
-      .eq('document_id', documentId);
+      .eq('document_id', docId);
 
     if (count && count > 0) {
       return res.status(200).json({ message: 'Already processed' });
@@ -65,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await sleep(300);
 
         const { error } = await supabaseAdmin.from('document_chunks').insert({
-          document_id: documentId,
+          document_id: docId,
           filename,
           page_number: page.page_number,
           chunk_index: chunkIndex++,
@@ -80,14 +83,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await supabaseAdmin.from('documents')
       .update({ status: 'ready', chunk_count: totalChunks })
-      .eq('id', documentId);
+      .eq('id', docId);
 
     return res.status(200).json({ success: true, chunks: totalChunks });
 
   } catch (err: any) {
-    await supabaseAdmin.from('documents')
-      .update({ status: 'error', error_message: err.message })
-      .eq('id', documentId);
+    if (docId) {
+      await supabaseAdmin.from('documents')
+        .update({ status: 'error', error_message: err.message })
+        .eq('id', docId);
+    }
     return res.status(500).json({ error: err.message });
   }
 }
