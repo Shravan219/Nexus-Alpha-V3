@@ -9,8 +9,8 @@
     }
   },
   "rewrites": [
-    { "source": "/api/documents/:id", "destination": "/api/documents/[id].ts" },
-    { "source": "/api/employees/:id", "destination": "/api/employees/[id].ts" },
+    { "source": "/api/documents/:id", "destination": "/api/documents/_id.ts" },
+    { "source": "/api/employees/:id", "destination": "/api/employees/_id.ts" },
     { "source": "/api/employees", "destination": "/api/employees/index.ts" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
