@@ -9,8 +9,6 @@
     }
   },
   "rewrites": [
-    { "source": "/api/documents/:id", "destination": "/api/documents/_id.ts?id=:id" },
-    { "source": "/api/employees/:id", "destination": "/api/employees/_id.ts?id=:id" },
     { "source": "/api/employees", "destination": "/api/employees/index.ts" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }

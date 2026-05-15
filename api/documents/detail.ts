@@ -27,6 +27,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const supabaseAdmin = getSupabase();
     const id = req.query.id as string;
 
+    if (method === 'GET') {
+      if (!id) return res.status(400).json({ error: 'ID required' });
+      const { data, error } = await supabaseAdmin
+        .from('documents')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (error) throw error;
+      return res.status(200).json(data);
+    }
+
     if (method === 'DELETE') {
       if (!id) return res.status(400).json({ error: 'Document ID required' });
 
