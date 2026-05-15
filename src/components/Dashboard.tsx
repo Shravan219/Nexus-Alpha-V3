@@ -8,7 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 import ActivationModal from '@/components/ActivationModal';
 
-export default function DashboardPage() {
+export function DashboardPage() {
   return (
     <div>
       {/* Temporarily render the modal for testing */}
