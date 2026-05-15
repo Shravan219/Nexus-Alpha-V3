@@ -7,7 +7,7 @@ import { FileText, Cpu, MessageSquareText, ShieldCheck, Database } from 'lucide-
 import { formatDistanceToNow } from 'date-fns';
 
 // Import your custom Web3 activation modal
-import { ActivationModal } from '@/components/ActivationModal';
+import ActivationModal from '@/components/ActivationModal';
 
 interface DashboardProps {
   documents: Document[];
