@@ -38,9 +38,9 @@ export default function AdminPanel() {
 
   const handleToggleActive = async (empId: string, currentStatus: boolean) => {
     try {
-      const res = await authFetch(`/api/employees/${empId}`, {
+      const res = await authFetch(`/api/employees?id=${empId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ isActive: !currentStatus })
+        body: JSON.stringify({ is_active: !currentStatus })
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Unknown server error' }));
@@ -56,7 +56,7 @@ export default function AdminPanel() {
   const handleDelete = async (empId: string) => {
     if (!confirm('Permanently delete this employee account? This will orphan their conversations.')) return;
     try {
-      const res = await authFetch(`/api/employees/${empId}`, {
+      const res = await authFetch(`/api/employees?id=${empId}`, {
         method: 'DELETE'
       });
       if (!res.ok) {
