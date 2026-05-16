@@ -98,13 +98,28 @@ begin
 end;
 $$;
 
--- IMPORTANT: Disable RLS for backend ingestion
-alter table public.document_chunks disable row level security;
-alter table public.documents disable row level security;
-alter table public.messages disable row level security;
-alter table public.conversations disable row level security;
-alter table public.employees disable row level security;
-alter table public.sessions disable row level security;
+-- License Management Table
+create table licenses (
+  id uuid primary key default gen_random_uuid(),
+  license_key text unique not null,
+  is_active boolean default true,
+  allowed_domain text default 'ANY',
+  transaction_hash text,
+  payment_received_at timestamptz,
+  created_at timestamptz default now()
+);
+
+-- IMPORTANT: Enable RLS on all tables to lock them down
+alter table public.document_chunks enable row level security;
+alter table public.documents enable row level security;
+alter table public.messages enable row level security;
+alter table public.conversations enable row level security;
+alter table public.employees enable row level security;
+alter table public.sessions enable row level security;
+alter table public.licenses enable row level security;
+
+-- Default RLS Policies (Deny All by default, which happens when RLS is enabled without policies)
+-- The backend uses the SERVICE_ROLE which bypasses RLS safely.
 ```
 
 # Storage Setup
